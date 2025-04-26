@@ -1,4 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Project specific
 data/
+logs/*.log
 config/config.yaml
+auditluma.*.log
+auditluma.*.log.zip
+*.log
+reports/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
 auditluma.2025-03-30_15-01-25_292356.log.zip
 auditluma.log
