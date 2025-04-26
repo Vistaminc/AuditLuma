@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuditLuma安全审计报告 - {{ project_name }}</title>
+    <style>
+        :root {
+            --primary-color: #4a6baf;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+            --critical-color: #ff0000;
+            --high-color: #ff7f00;
+            --medium-color: #ffff00;
+            --low-color: #00ff00;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 5px;
+        }
+        
+        h1, h2, h3, h4 {
+            color: var(--primary-color);
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        
+        h1 {
+            font-size: 2.2em;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            color: white;
+            margin-top: 0;
+        }
+        
+        h2 {
+            font-size: 1.8em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        
+        h3 {
+            font-size: 1.5em;
+        }
+        
+        h4 {
+            font-size: 1.3em;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .summary-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-item {
+            flex: 1;
+            min-width: 200px;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+            text-align: center;
+            background-color: white;
+        }
+        
+        .summary-item h3 {
+            margin-top: 0;
+            color: var(--secondary-color);
+        }
+        
+        .summary-item .count {
+            font-size: 2em;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .severity-critical { color: var(--critical-color); }
+        .severity-high { color: var(--high-color); }
+        .severity-medium { color: var(--medium-color); background-color: #333; }
+        .severity-low { color: var(--low-color); }
+        .severity-info { color: var(--info-color); }
+        
+        .severity-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.8em;
+        }
+        
+        .badge-critical { background-color: var(--critical-color); }
+        .badge-high { background-color: var(--high-color); }
+        .badge-medium { background-color: var(--medium-color); color: black; }
+        .badge-low { background-color: var(--low-color); color: black; }
+        .badge-info { background-color: var(--info-color); }
+        
+        .vuln-card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .vuln-card .card-header {
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
+            background-color: #f8f9fa;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .vuln-card .card-body {
+            padding: 15px;
+        }
+        
+        .vuln-card .card-footer {
+            border-top: 1px solid #ddd;
+            padding: 10px 15px;
+            background-color: #f8f9fa;
+        }
+        
+        .code-section {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        .code-line {
+            display: block;
+            white-space: pre;
+        }
+        
+        .file-path {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #eee;
+            padding: 3px 5px;
+            border-radius: 3px;
+        }
+        
+        .charts-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-container {
+            flex: 1;
+            min-width: 300px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-img {
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+        }
+        
+        .dependency-graph {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .dependency-graph img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .remediation-section {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            color: var(--secondary-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AuditLuma安全审计报告</h1>
+            <p>项目名称: {{ project_name }} | 扫描日期: {{ scan_date }}</p>
+        </header>
+        
+        <section id="summary">
+            <h2>漏洞摘要</h2>
+            <div class="summary-box">
+                <div class="summary-item">
+                    <h3>扫描文件数</h3>
+                    <div class="count">{{ scan_info.scanned_files }}</div>
+                </div>
+                <div class="summary-item">
+                    <h3>扫描代码行数</h3>
+                    <div class="count">{{ scan_info.scanned_lines }}</div>
+                </div>
+                <div class="summary-item">
+                    <h3>扫描时长</h3>
+                    <div class="count">{{ scan_info.scan_duration }}</div>
+                </div>
+                <div class="summary-item">
+                    <h3>发现漏洞总数</h3>
+                    <div class="count">{{ total_vulnerabilities }}</div>
+                </div>
+            </div>
+            
+            <div class="summary-box">
+                <div class="summary-item">
+                    <h3>严重漏洞</h3>
+                    <div class="count severity-critical">{{ vulnerabilities_by_severity.critical|length }}</div>
+                </div>
+                <div class="summary-item">
+                    <h3>高危漏洞</h3>
+                    <div class="count severity-high">{{ vulnerabilities_by_severity.high|length }}</div>
+                </div>
+                <div class="summary-item">
+                    <h3>中危漏洞</h3>
+                    <div class="count severity-medium">{{ vulnerabilities_by_severity.medium|length }}</div>
+                </div>
+                <div class="summary-item">
+                    <h3>低危漏洞</h3>
+                    <div class="count severity-low">{{ vulnerabilities_by_severity.low|length }}</div>
+                </div>
+                <div class="summary-item">
+                    <h3>信息提醒</h3>
+                    <div class="count severity-info">{{ vulnerabilities_by_severity.info|length }}</div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="charts">
+            <h2>漏洞统计图表</h2>
+            <div class="charts-section">
+                {% if charts.severity_chart %}
+                <div class="chart-container">
+                    <h3>按严重程度分布</h3>
+                    <img src="{{ charts.severity_chart }}" alt="Severity Distribution" class="chart-img" />
+                </div>
+                {% endif %}
+                
+                {% if charts.vuln_type_chart %}
+                <div class="chart-container">
+                    <h3>按漏洞类型分布</h3>
+                    <img src="{{ charts.vuln_type_chart }}" alt="Vulnerability Type Distribution" class="chart-img" />
+                </div>
+                {% endif %}
+                
+                {% if charts.file_chart %}
+                <div class="chart-container">
+                    <h3>按文件分布</h3>
+                    <img src="{{ charts.file_chart }}" alt="File Distribution" class="chart-img" />
+                </div>
+                {% endif %}
+            </div>
+        </section>
+        
+        {% if dependency_graph %}
+        <section id="dependency-graph">
+            <h2>代码依赖关系图</h2>
+            <div class="dependency-graph">
+                <img src="{{ dependency_graph }}" alt="Code Dependency Graph" />
+            </div>
+            <p class="chart-note">* 此图显示了代码组件之间的依赖关系，可用于理解代码结构和识别潜在的安全薄弱点。</p>
+        </section>
+        {% endif %}
+        
+        <section id="vulnerabilities">
+            <h2>漏洞详情</h2>
+            
+            {% if vulnerabilities_by_severity.critical|length > 0 %}
+            <h3>严重漏洞 ({{ vulnerabilities_by_severity.critical|length }})</h3>
+            {% for vuln in vulnerabilities_by_severity.critical %}
+            <div class="vuln-card">
+                <div class="card-header">
+                    <span>{{ vuln.vulnerability_type }}</span>
+                    <span class="severity-badge badge-critical">严重</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> {{ vuln.id }}</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">{{ vuln.file_path }}</span></p>
+                    <p><strong>行范围:</strong> {{ vuln.start_line }}-{{ vuln.end_line }}</p>
+                    <p><strong>描述:</strong> {{ vuln.description }}</p>
+                    
+                    {% if vuln.snippet %}
+                    <div class="code-section">
+                        <pre>{{ vuln.snippet }}</pre>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% for remediation in remediations %}
+                    {% if remediation.vulnerability_id == vuln.id %}
+                    <div class="card-footer">
+                        <h4>修复建议</h4>
+                        <div class="remediation-section">
+                            {{ remediation.specific_remediation|safe }}
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% endif %}
+            
+            {% if vulnerabilities_by_severity.high|length > 0 %}
+            <h3>高危漏洞 ({{ vulnerabilities_by_severity.high|length }})</h3>
+            {% for vuln in vulnerabilities_by_severity.high %}
+            <div class="vuln-card">
+                <div class="card-header">
+                    <span>{{ vuln.vulnerability_type }}</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> {{ vuln.id }}</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">{{ vuln.file_path }}</span></p>
+                    <p><strong>行范围:</strong> {{ vuln.start_line }}-{{ vuln.end_line }}</p>
+                    <p><strong>描述:</strong> {{ vuln.description }}</p>
+                    
+                    {% if vuln.snippet %}
+                    <div class="code-section">
+                        <pre>{{ vuln.snippet }}</pre>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% for remediation in remediations %}
+                    {% if remediation.vulnerability_id == vuln.id %}
+                    <div class="card-footer">
+                        <h4>修复建议</h4>
+                        <div class="remediation-section">
+                            {{ remediation.specific_remediation|safe }}
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% endif %}
+            
+            {% if vulnerabilities_by_severity.medium|length > 0 %}
+            <h3>中危漏洞 ({{ vulnerabilities_by_severity.medium|length }})</h3>
+            {% for vuln in vulnerabilities_by_severity.medium %}
+            <div class="vuln-card">
+                <div class="card-header">
+                    <span>{{ vuln.vulnerability_type }}</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> {{ vuln.id }}</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">{{ vuln.file_path }}</span></p>
+                    <p><strong>行范围:</strong> {{ vuln.start_line }}-{{ vuln.end_line }}</p>
+                    <p><strong>描述:</strong> {{ vuln.description }}</p>
+                    
+                    {% if vuln.snippet %}
+                    <div class="code-section">
+                        <pre>{{ vuln.snippet }}</pre>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% for remediation in remediations %}
+                    {% if remediation.vulnerability_id == vuln.id %}
+                    <div class="card-footer">
+                        <h4>修复建议</h4>
+                        <div class="remediation-section">
+                            {{ remediation.specific_remediation|safe }}
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% endif %}
+            
+            {% if vulnerabilities_by_severity.low|length > 0 %}
+            <h3>低危漏洞 ({{ vulnerabilities_by_severity.low|length }})</h3>
+            {% for vuln in vulnerabilities_by_severity.low %}
+            <div class="vuln-card">
+                <div class="card-header">
+                    <span>{{ vuln.vulnerability_type }}</span>
+                    <span class="severity-badge badge-low">低危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> {{ vuln.id }}</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">{{ vuln.file_path }}</span></p>
+                    <p><strong>行范围:</strong> {{ vuln.start_line }}-{{ vuln.end_line }}</p>
+                    <p><strong>描述:</strong> {{ vuln.description }}</p>
+                    
+                    {% if vuln.snippet %}
+                    <div class="code-section">
+                        <pre>{{ vuln.snippet }}</pre>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% for remediation in remediations %}
+                    {% if remediation.vulnerability_id == vuln.id %}
+                    <div class="card-footer">
+                        <h4>修复建议</h4>
+                        <div class="remediation-section">
+                            {{ remediation.specific_remediation|safe }}
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% endif %}
+            
+            {% if vulnerabilities_by_severity.info|length > 0 %}
+            <h3>信息提醒 ({{ vulnerabilities_by_severity.info|length }})</h3>
+            {% for vuln in vulnerabilities_by_severity.info %}
+            <div class="vuln-card">
+                <div class="card-header">
+                    <span>{{ vuln.vulnerability_type }}</span>
+                    <span class="severity-badge badge-info">信息</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> {{ vuln.id }}</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">{{ vuln.file_path }}</span></p>
+                    <p><strong>行范围:</strong> {{ vuln.start_line }}-{{ vuln.end_line }}</p>
+                    <p><strong>描述:</strong> {{ vuln.description }}</p>
+                    
+                    {% if vuln.snippet %}
+                    <div class="code-section">
+                        <pre>{{ vuln.snippet }}</pre>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% for remediation in remediations %}
+                    {% if remediation.vulnerability_id == vuln.id %}
+                    <div class="card-footer">
+                        <h4>修复建议</h4>
+                        <div class="remediation-section">
+                            {{ remediation.specific_remediation|safe }}
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% endif %}
+        </section>
+        
+        <section id="security-recommendations">
+            <h2>安全建议</h2>
+            <div class="vuln-card">
+                <div class="card-header">
+                    <span>整体安全建议</span>
+                </div>
+                <div class="card-body">
+                    <h4>安全最佳实践</h4>
+                    <ul>
+                        <li><strong>输入验证</strong>: 验证所有来自外部来源的数据，确保它们符合预期格式和长度。</li>
+                        <li><strong>输出编码</strong>: 对所有输出到用户界面的数据进行适当的编码，防止XSS攻击。</li>
+                        <li><strong>参数化查询</strong>: 使用参数化查询和预处理语句，防止SQL注入攻击。</li>
+                        <li><strong>身份验证和授权</strong>: 实施强大的身份验证机制，并确保适当的授权检查。</li>
+                        <li><strong>安全密码存储</strong>: 使用强哈希算法(如bcrypt)存储密码，并使用盐值。</li>
+                        <li><strong>敏感数据保护</strong>: 对敏感数据进行加密存储和传输。</li>
+                        <li><strong>安全配置</strong>: 确保应用程序和服务器配置遵循安全最佳实践。</li>
+                        <li><strong>错误处理</strong>: 实现安全的错误处理，避免泄露敏感信息。</li>
+                        <li><strong>日志记录和监控</strong>: 记录安全相关事件并定期审查日志。</li>
+                        <li><strong>依赖管理</strong>: 定期更新和审计第三方依赖，修复已知漏洞。</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        
+        <footer>
+            <p>由 AuditLuma 安全审计系统生成 | {{ scan_date }}</p>
+        </footer>
+    </div>
+</body>
+</html>

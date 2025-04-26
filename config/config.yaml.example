@@ -1,0 +1,105 @@
+# AuditLuma 配置文件
+
+# LLM 配置
+llm:
+  provider: "openai"  # 选项: openai, deepseek, moonshot, qwen, baichuan, zhipu, azure
+  base_url: "https://api.openai.com/v1"
+  api_key: ""  # 在此处设置 API 密钥或使用环境变量
+  model: "gpt-4-turbo-preview"  # 默认使用的模型
+  max_tokens: 8000
+  temperature: 0.1
+  # 其他提供商示例配置
+  providers:
+    openai:
+      base_url: "https://api.openai.com/v1"
+      model: "gpt-4-turbo-preview"
+    deepseek:
+      base_url: "https://api.deepseek.com/v1"
+      model: "deepseek-chat"
+    moonshot:  # 硅基流动
+      base_url: "https://api.moonshot.cn/v1"
+      model: "moonshot-v1-8k"
+    qwen:  # 通义千问
+      base_url: "https://dashscope.aliyuncs.com/api/v1"
+      model: "qwen-max"
+    baichuan:
+      base_url: "https://api.baichuan-ai.com/v1"
+      model: "Baichuan4"
+    zhipu:  # 智谱AI
+      base_url: "https://open.bigmodel.cn/api/paas/v4"
+      model: "glm-4"
+    azure:
+      base_url: "https://YOUR_RESOURCE_NAME.openai.azure.com"
+      model: "gpt-4"
+      deployment_name: "YOUR_DEPLOYMENT_NAME"
+
+# 项目配置
+project:
+  name: "AuditLuma项目"
+  max_file_size: 1000000  # 处理的最大文件大小（字节）
+  max_batch_size: 20  # 并行处理的最大文件数
+  ignored_extensions: [".jpg", ".png", ".gif", ".mp3", ".mp4", ".zip", ".tar", ".gz"]
+  ignored_directories: ["node_modules", "__pycache__", ".git", "dist", "build", "venv", "env"]
+  target_dir: "./goalfile"  # 默认目标项目目录
+
+# Self-RAG 配置
+self_rag:
+  enabled: true
+  vector_store: "faiss"
+  embedding_model: "text-embedding-3-small"  # 默认嵌入模型
+  chunk_size: 1000
+  chunk_overlap: 200
+  max_documents: 10000
+  retrieval_k: 5
+  relevance_threshold: 0.75
+
+# 多智能体协作协议 (MCP)
+mcp:
+  enabled: true
+  agents:
+    - name: "orchestrator"
+      description: "协调所有智能体和工作流程"
+      type: "coordinator"
+      priority: 1
+    - name: "code_parser"
+      description: "分析代码结构并提取依赖关系"
+      type: "analyzer"
+      priority: 2
+    - name: "security_analyst"
+      description: "识别安全漏洞"
+      type: "analyst"
+      priority: 3
+    - name: "code_analyzer"
+      description: "分析代码结构和依赖关系"
+      type: "analyzer" 
+      priority: 4
+    - name: "remediation"
+      description: "提供代码修复建议和最佳实践"
+      type: "generator"
+      priority: 5
+
+# 漏洞数据库
+vulnerability_db:
+  sources:
+    - "OWASP Top 10"
+    - "CWE Top 25"
+    - "SANS Top 25"
+  update_frequency: "weekly"
+  local_storage: "./data/vulnerability_db"
+
+# 输出配置
+output:
+  formats: ["html", "json", "markdown"]
+  visualization: true
+  graph_format: "d3"
+  max_results: 100
+  severity_levels: ["critical", "high", "medium", "low", "info"]
+  report_dir: "./reports"
+  report_format: "html"
+
+# 默认模型配置
+default_models:
+  code_analysis: "gpt-4-turbo-preview"  # 用于代码分析的默认模型
+  security_audit: "gpt-4-turbo-preview"  # 用于安全审计的默认模型
+  remediation: "gpt-4-turbo-preview"  # 用于生成修复建议的默认模型
+  summarization: "gpt-3.5-turbo"       # 用于总结报告的默认模型
