@@ -48,5 +48,5 @@ reports/
 auditluma.2025-03-30_15-01-25_292356.log.zip
 auditluma.log
 logs/*
-reports/
+reports/*
 goalfile/*
