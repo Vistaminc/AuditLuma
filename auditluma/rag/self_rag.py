@@ -10,6 +10,7 @@ import numpy as np
 from pathlib import Path
 import hashlib
 from dataclasses import dataclass, field
+import asyncio
 
 from loguru import logger
 
@@ -327,15 +328,37 @@ class SelfRAG:
             )
             documents.append(doc)
         
-        # 生成嵌入
-        for doc in documents:
-            doc.embedding = await self.embedder.aembed(doc.content)
+        # 使用并发生成嵌入
+        async def generate_embedding(doc):
+            try:
+                doc.embedding = await self.embedder.aembed(doc.content)
+                return doc
+            except Exception as e:
+                logger.error(f"为文档生成嵌入时出错: {doc.id}, {e}")
+                return None
+
+        # 使用信号量限制并发数量，避免过多并发请求
+        semaphore = asyncio.Semaphore(10)  # 控制最大并发数
+        
+        async def bounded_generate_embedding(doc):
+            async with semaphore:
+                return await generate_embedding(doc)
+        
+        # 并发生成所有文档的嵌入
+        embedding_tasks = [bounded_generate_embedding(doc) for doc in documents]
+        embedded_docs = await asyncio.gather(*embedding_tasks)
+        
+        # 过滤出成功生成嵌入的文档
+        valid_docs = [doc for doc in embedded_docs if doc and doc.embedding]
         
         # 添加到向量存储
-        self.vector_store.add(documents)
-        self.processed_files.add(file.id)
-        
-        logger.info(f"已将文件添加到知识库: {file.id} ({len(chunks)}个块)")
+        if valid_docs:
+            self.vector_store.add(valid_docs)
+            self.processed_files.add(file.id)
+            logger.info(f"已将文件添加到知识库: {file.id} ({len(valid_docs)}/{len(chunks)}个块)")
+        else:
+            logger.warning(f"文件 {file.id} 没有生成有效的嵌入，将作为无嵌入文件记录")
+            self.register_file_without_embedding(file)
     
     def register_file_without_embedding(self, file: SourceFile) -> None:
         """仅记录文件但不生成嵌入
@@ -380,6 +403,44 @@ class SelfRAG:
         self.processed_files.add(unit.id)
         
         logger.debug(f"已将代码单元添加到知识库: {unit.id}")
+    
+    async def add_batch_code_units(self, units: List[CodeUnit], max_concurrency: int = 20) -> None:
+        """批量将代码单元添加到知识库
+        
+        Args:
+            units: 要添加的代码单元列表
+            max_concurrency: 最大并发数
+        """
+        if not units:
+            return
+            
+        # 过滤掉已处理的单元
+        units_to_process = [unit for unit in units if unit.id not in self.processed_files]
+        
+        if not units_to_process:
+            logger.debug(f"没有新的代码单元需要添加到知识库")
+            return
+            
+        logger.info(f"批量添加 {len(units_to_process)} 个代码单元到知识库")
+        
+        # 限制并发数
+        semaphore = asyncio.Semaphore(max_concurrency)
+        
+        async def process_unit(unit):
+            async with semaphore:
+                try:
+                    await self.add_code_unit(unit)
+                    return True
+                except Exception as e:
+                    logger.error(f"添加代码单元到知识库时出错: {unit.id}, {e}")
+                    return False
+        
+        # 并发处理所有单元
+        tasks = [process_unit(unit) for unit in units_to_process]
+        results = await asyncio.gather(*tasks)
+        
+        success_count = sum(1 for r in results if r)
+        logger.info(f"成功添加 {success_count}/{len(units_to_process)} 个代码单元到知识库")
     
     async def retrieve(self, query: str, k: int = 5) -> List[Tuple[Document, float]]:
         """检索与查询相关的文档"""

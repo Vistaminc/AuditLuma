@@ -127,16 +127,50 @@ class AgentOrchestrator:
             return {}
         
         try:
-            # 执行代码结构分析
-            task_data = {"code_units": code_units}
-            code_structure = await code_analyzer.execute_task("analyze_code_structure", task_data)
+            # 使用并行处理分析代码结构
+            tasks = []
+            semaphore = asyncio.Semaphore(self.workers)
+            all_structure_results = {}
+            
+            # 根据代码单元类型进行分组
+            units_by_type = {}
+            for unit in code_units:
+                unit_type = unit.type
+                if unit_type not in units_by_type:
+                    units_by_type[unit_type] = []
+                units_by_type[unit_type].append(unit)
+            
+            # 定义并发处理函数
+            async def analyze_unit_group(unit_type, units):
+                async with semaphore:
+                    try:
+                        group_task_data = {"code_units": units, "unit_type": unit_type}
+                        group_result = await code_analyzer.execute_task("analyze_code_structure_group", group_task_data)
+                        return group_result
+                    except Exception as e:
+                        logger.error(f"分析代码单元组 {unit_type} 时出错: {e}")
+                        return {}
+            
+            # 为每个类型组创建任务
+            for unit_type, units in units_by_type.items():
+                logger.debug(f"为 {unit_type} 类型创建分析任务，包含 {len(units)} 个单元")
+                task = asyncio.create_task(analyze_unit_group(unit_type, units))
+                tasks.append(task)
+            
+            # 等待所有任务完成
+            group_results = await asyncio.gather(*tasks)
+            
+            # 合并所有结果
+            for result in group_results:
+                if result:
+                    all_structure_results.update(result)
             
             # 保存依赖图供后续使用
             if hasattr(code_analyzer, "dependency_graph"):
                 self.dependency_graph = code_analyzer.dependency_graph
                 
-            logger.info(f"代码结构分析完成，处理了 {len(code_structure)} 个代码单元")
-            return code_structure
+            logger.info(f"代码结构分析完成，处理了 {len(all_structure_results)} 个代码单元")
+            return all_structure_results
             
         except Exception as e:
             logger.error(f"代码结构分析时出错: {e}")
@@ -160,8 +194,7 @@ class AgentOrchestrator:
         # 如果启用了Self-RAG，准备知识库
         if Config.self_rag.enabled:
             logger.info("初始化Self-RAG知识库...")
-            for file in source_files:
-                await self._add_to_knowledge_base(file)
+            await self._batch_add_to_knowledge_base(source_files, batch_size=self.workers)
         
         # 提取代码单元（如果尚未提取）
         if not self.code_units:
@@ -249,12 +282,53 @@ class AgentOrchestrator:
             }
         
         try:
-            # 执行修复建议生成
-            task_data = {"vulnerabilities": vulnerabilities}
-            remediation_results = await remediation_agent.execute_task("generate_remediation", task_data)
+            # 按漏洞类型分组，以便相似的漏洞可以共享通用修复建议
+            vuln_by_type = {}
+            for vuln in vulnerabilities:
+                vuln_type = vuln.vulnerability_type
+                if vuln_type not in vuln_by_type:
+                    vuln_by_type[vuln_type] = []
+                vuln_by_type[vuln_type].append(vuln)
             
-            logger.info(f"修复建议生成完成，生成了 {remediation_results.get('remediation_count', 0)} 个建议")
-            return remediation_results
+            # 创建分析任务
+            all_remediations = []
+            tasks = []
+            semaphore = asyncio.Semaphore(self.workers)  # 控制并发数
+            
+            # 将修复建议生成分解为并发任务
+            async def process_vulnerability(vuln):
+                async with semaphore:
+                    try:
+                        # 对单个漏洞执行修复建议生成
+                        task_data = {"vulnerabilities": [vuln]}
+                        result = await remediation_agent.execute_task("generate_remediation", task_data)
+                        if result and "remediations" in result and len(result["remediations"]) > 0:
+                            return result["remediations"][0]
+                        return None
+                    except Exception as e:
+                        logger.error(f"生成漏洞 {vuln.id} 的修复建议时出错: {e}")
+                        return None
+            
+            # 创建并发任务
+            for vuln in vulnerabilities:
+                task = asyncio.create_task(process_vulnerability(vuln))
+                tasks.append(task)
+            
+            # 并发执行所有修复建议生成任务
+            remediation_results = await asyncio.gather(*tasks)
+            
+            # 收集有效的修复建议
+            for remediation in remediation_results:
+                if remediation:
+                    all_remediations.append(remediation)
+            
+            logger.info(f"修复建议生成完成，生成了 {len(all_remediations)} 个建议")
+            
+            return {
+                "summary": f"生成了 {len(all_remediations)} 个漏洞修复建议",
+                "remediation_count": len(all_remediations),
+                "remediations": all_remediations
+            }
             
         except Exception as e:
             logger.error(f"生成修复建议时出错: {e}")
@@ -320,6 +394,44 @@ class AgentOrchestrator:
             except:
                 pass
     
+    async def _batch_add_to_knowledge_base(self, files: List[SourceFile], batch_size: int = 5) -> None:
+        """批量将源文件添加到Self-RAG知识库
+        
+        Args:
+            files: 要添加的源文件列表
+            batch_size: 每批处理的文件数量
+        """
+        logger.info(f"批量添加 {len(files)} 个文件到知识库，批次大小: {batch_size}")
+        
+        # 过滤掉已处理的文件
+        files_to_process = [f for f in files if f.id not in self_rag.processed_files]
+        if len(files_to_process) < len(files):
+            logger.info(f"跳过 {len(files) - len(files_to_process)} 个已处理的文件")
+        
+        # 如果没有需要处理的文件，直接返回
+        if not files_to_process:
+            logger.info("没有新文件需要添加到知识库")
+            return
+            
+        # 将文件分成批次
+        batches = [files_to_process[i:i+batch_size] for i in range(0, len(files_to_process), batch_size)]
+        logger.info(f"将 {len(files_to_process)} 个文件分成 {len(batches)} 个批次处理")
+        
+        # 批量处理文件
+        for i, batch in enumerate(batches):
+            logger.info(f"处理批次 {i+1}/{len(batches)}, 包含 {len(batch)} 个文件")
+            
+            # 创建并发任务
+            tasks = []
+            for file in batch:
+                task = asyncio.create_task(self._add_to_knowledge_base(file))
+                tasks.append(task)
+            
+            # 等待当前批次完成
+            await asyncio.gather(*tasks)
+            
+        logger.info(f"完成批量添加 {len(files_to_process)} 个文件到知识库")
+    
     async def _extract_code_units(self, source_files: List[SourceFile]) -> None:
         """从源文件中提取代码单元"""
         tasks = []
@@ -344,8 +456,16 @@ class AgentOrchestrator:
         results = await asyncio.gather(*tasks)
         
         # 收集所有代码单元
+        all_units = []
         for units in results:
-            self.code_units.extend(units)
+            if units:
+                all_units.extend(units)
+                self.code_units.extend(units)
+                
+        # 如果启用了Self-RAG，批量添加代码单元到知识库
+        if Config.self_rag.enabled and all_units:
+            logger.info(f"将提取的代码单元添加到知识库...")
+            await self_rag.add_batch_code_units(all_units, max_concurrency=self.workers)
     
     async def _run_simplified_analysis(self) -> List[VulnerabilityResult]:
         """运行简化的单智能体分析流程"""

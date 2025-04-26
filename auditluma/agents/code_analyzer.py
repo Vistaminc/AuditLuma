@@ -45,6 +45,8 @@ class CodeAnalyzerAgent(BaseAgent):
         """执行任务 - 实现基类的抽象方法"""
         if task_type == "analyze_code_structure":
             return await self._analyze_code_structure(task_data)
+        elif task_type == "analyze_code_structure_group":
+            return await self._analyze_code_structure_group(task_data)
         elif task_type == "analyze_dependencies":
             return await self._analyze_dependencies(task_data)
         elif task_type == "get_call_path":
@@ -437,3 +439,118 @@ class CodeAnalyzerAgent(BaseAgent):
         except Exception as e:
             logger.warning(f"计算代码复杂度时出错: {e}")
             return 1  # 出错时返回最低复杂度
+    
+    async def _analyze_code_structure_group(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """分析特定类型组的代码结构，用于并发处理
+        
+        Args:
+            data: 包含代码单元组和单元类型的数据
+            
+        Returns:
+            该组的代码结构分析结果
+        """
+        code_units = data.get("code_units", [])
+        unit_type = data.get("unit_type", "unknown")
+        
+        if not code_units:
+            logger.warning(f"没有提供代码单元进行分析，类型: {unit_type}")
+            return {}
+        
+        logger.info(f"开始分析 {len(code_units)} 个类型为 {unit_type} 的代码单元")
+        
+        # 分析结果存储
+        group_results = {}
+        
+        # 首先添加所有节点到图中
+        for unit in code_units:
+            self.dependency_graph.add_node(
+                unit.id,
+                name=unit.name,
+                type=unit.type,
+                file_path=str(unit.source_file.path),
+                start_line=unit.start_line,
+                end_line=unit.end_line
+            )
+            
+            # 缓存代码单元信息
+            unit_info = {
+                "id": unit.id,
+                "name": unit.name,
+                "type": unit.type,
+                "file_path": str(unit.source_file.path),
+                "start_line": unit.start_line,
+                "end_line": unit.end_line,
+                "parent_id": unit.parent_id,
+                "dependencies": [],
+                "dependents": [],
+                "complexity": 0,
+                "metrics": {}
+            }
+            
+            self.code_structure_cache[unit.id] = unit_info
+            group_results[unit.id] = unit_info
+        
+        # 分析代码单元间的依赖关系
+        dependencies = await self._analyze_code_dependencies(code_units)
+        
+        # 更新依赖关系图和缓存
+        for source_id, target_id, attributes in dependencies:
+            # 添加边到图中
+            self.dependency_graph.add_edge(
+                source_id, 
+                target_id,
+                **attributes
+            )
+            
+            # 更新缓存和结果
+            if source_id in self.code_structure_cache:
+                self.code_structure_cache[source_id]["dependencies"].append({
+                    "id": target_id,
+                    "type": attributes.get("type", "unknown"),
+                    "description": attributes.get("description", "")
+                })
+                
+                if source_id in group_results:
+                    group_results[source_id]["dependencies"].append({
+                        "id": target_id,
+                        "type": attributes.get("type", "unknown"),
+                        "description": attributes.get("description", "")
+                    })
+            
+            if target_id in self.code_structure_cache:
+                self.code_structure_cache[target_id]["dependents"].append({
+                    "id": source_id,
+                    "type": attributes.get("type", "unknown"),
+                    "description": attributes.get("description", "")
+                })
+                
+                if target_id in group_results:
+                    group_results[target_id]["dependents"].append({
+                        "id": source_id,
+                        "type": attributes.get("type", "unknown"),
+                        "description": attributes.get("description", "")
+                    })
+        
+        # 计算每个单元的复杂度
+        for unit in code_units:
+            complexity = await self._calculate_complexity(unit)
+            
+            if unit.id in self.code_structure_cache:
+                self.code_structure_cache[unit.id]["complexity"] = complexity
+                
+                # 添加额外度量
+                metrics = {
+                    "lines_of_code": unit.end_line - unit.start_line + 1,
+                    "cyclomatic_complexity": complexity,
+                    "dependency_count": len(self.code_structure_cache[unit.id]["dependencies"]),
+                    "dependent_count": len(self.code_structure_cache[unit.id]["dependents"])
+                }
+                
+                self.code_structure_cache[unit.id]["metrics"] = metrics
+                
+                if unit.id in group_results:
+                    group_results[unit.id]["complexity"] = complexity
+                    group_results[unit.id]["metrics"] = metrics
+        
+        logger.info(f"完成 {len(code_units)} 个类型为 {unit_type} 的代码单元分析")
+        return group_results

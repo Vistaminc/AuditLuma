@@ -329,22 +329,46 @@ class RemediationAgent(BaseAgent):
         
         # 生成修复建议
         all_remediations = []
-        for vuln_type, vulns in vuln_by_type.items():
+        
+        # 处理并发调用的单个漏洞情况
+        if len(vulnerabilities) == 1:
+            vuln = vulnerabilities[0]
+            vuln_type = vuln.vulnerability_type
+            
             # 获取该类型的通用修复建议
             general_advice = self._get_remediation_template(vuln_type)
             
-            # 为每个漏洞实例生成具体的修复建议
-            for vuln in vulns:
-                remediation = {
-                    "vulnerability_id": vuln.id,
-                    "vulnerability_type": vuln_type,
-                    "severity": vuln.severity,
-                    "file_path": vuln.file_path,
-                    "line_range": f"{vuln.start_line}-{vuln.end_line}",
-                    "general_advice": general_advice,
-                    "specific_remediation": await self._generate_specific_remediation_for_vuln(vuln)
-                }
-                all_remediations.append(remediation)
+            # 生成具体修复建议
+            specific_remediation = await self._generate_specific_remediation_for_vuln(vuln)
+            
+            remediation = {
+                "vulnerability_id": vuln.id,
+                "vulnerability_type": vuln_type,
+                "severity": vuln.severity,
+                "file_path": vuln.file_path,
+                "line_range": f"{vuln.start_line}-{vuln.end_line}",
+                "general_advice": general_advice,
+                "specific_remediation": specific_remediation
+            }
+            all_remediations.append(remediation)
+        else:
+            # 批量处理多个漏洞（通常由orchestrator直接处理）
+            for vuln_type, vulns in vuln_by_type.items():
+                # 获取该类型的通用修复建议
+                general_advice = self._get_remediation_template(vuln_type)
+                
+                # 为每个漏洞实例生成具体的修复建议
+                for vuln in vulns:
+                    remediation = {
+                        "vulnerability_id": vuln.id,
+                        "vulnerability_type": vuln_type,
+                        "severity": vuln.severity,
+                        "file_path": vuln.file_path,
+                        "line_range": f"{vuln.start_line}-{vuln.end_line}",
+                        "general_advice": general_advice,
+                        "specific_remediation": await self._generate_specific_remediation_for_vuln(vuln)
+                    }
+                    all_remediations.append(remediation)
         
         logger.info(f"为 {len(vulnerabilities)} 个漏洞生成了 {len(all_remediations)} 个修复建议")
         

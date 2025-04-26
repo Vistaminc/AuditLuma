@@ -18,7 +18,7 @@ from loguru import logger
 from auditluma.config import Config
 
 
-def setup_logging(log_level: str = "INFO", log_file: Optional[str] = "auditluma.log") -> None:
+def setup_logging(log_level: str = "INFO") -> None:
     """设置日志系统"""
     # 移除所有默认处理器
     logger.remove()
@@ -32,18 +32,26 @@ def setup_logging(log_level: str = "INFO", log_file: Optional[str] = "auditluma.
     # 添加控制台输出
     logger.add(sys.stderr, format=log_format, level=level, colorize=True)
     
-    # 如果指定了日志文件，添加文件输出
-    if log_file:
-        logger.add(
-            log_file, 
-            format=log_format, 
-            level=level, 
-            rotation="10 MB", 
-            compression="zip",
-            retention="1 week"
-        )
+    # 创建logs目录（如果不存在）
+    logs_dir = Path("logs")
+    logs_dir.mkdir(exist_ok=True)
     
-    logger.info(f"日志系统初始化完成，级别: {log_level}, 文件: {log_file}")
+    # 生成日志文件名，格式为：年+月+日+时间（精确到ms）
+    current_time = datetime.now()
+    log_filename = current_time.strftime("%Y%m%d_%H-%M-%S_%f")[:-3]  # 去掉最后3位，保留毫秒
+    log_file_path = logs_dir / f"auditluma.{log_filename}.log"
+    
+    # 添加文件输出
+    logger.add(
+        str(log_file_path), 
+        format=log_format, 
+        level=level, 
+        rotation="10 MB", 
+        compression="zip",
+        retention="2 weeks"
+    )
+    
+    logger.info(f"日志系统初始化完成，级别: {log_level}, 文件: {log_file_path}")
 
 
 def calculate_project_hash(directory_path: str) -> str:

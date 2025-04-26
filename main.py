@@ -126,7 +126,9 @@ async def run_analysis(target_dir: str, output_dir: str, workers: int,
     
     # 初始化代码扫描器以收集所有源文件
     scanner = CodeScanner(str(target_dir_path))
-    source_files = scanner.scan()
+    # 使用异步扫描加速文件收集
+    logger.info("使用异步方式扫描文件...")
+    source_files = await scanner.scan_async()
     
     # 统计文件和代码行数
     total_files = len(source_files)
