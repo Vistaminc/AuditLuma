@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ project_name }} - 代码审计报告</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2a86db;
+            --secondary-color: #80ced7;
+            --accent-color: #63c5da;
+            --danger-color: #ff5a5f;
+            --warning-color: #ffbe0b;
+            --success-color: #52b788;
+            --info-color: #4361ee;
+            --light-bg: #f8f9fa;
+            --lighter-blue: #e6f3ff;
+            --card-bg: #ffffff;
+            --text-primary: #2c3e50;
+            --text-secondary: #6c757d;
+            --border-color: #e9ecef;
+            --shadow-color: rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        /* 顶部导航栏 */
+        .top-navbar {
+            background-color: var(--card-bg);
+            box-shadow: 0 2px 15px var(--shadow-color);
+            padding: 1rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 1040;
+        }
+
+        .main-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 侧边栏样式 */
+        .sidebar {
+            width: 280px;
+            background-color: var(--card-bg);
+            box-shadow: 2px 0 15px var(--shadow-color);
+            padding: 2rem 1.5rem;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-logo {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-logo h3 {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .sidebar-logo p {
+            color: var(--text-secondary);
+            margin-bottom: 0;
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .nav-item {
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .nav-link:hover {
+            background-color: var(--lighter-blue);
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            background-color: var(--lighter-blue);
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            margin-right: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 主内容区域 */
+        .content {
+            flex: 1;
+            padding: 2rem;
+            max-width: calc(100% - 280px);
+        }
+
+        /* 卡片样式 */
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow-color);
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 1.5rem;
+            background-color: var(--card-bg);
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px var(--shadow-color);
+        }
+
+        .card-header {
+            background-color: transparent;
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.25rem 1.5rem;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* 数据卡片 */
+        .stat-card {
+            display: flex;
+            border-radius: 10px;
+            overflow: hidden;
+            padding: 0;
+        }
+
+        .stat-icon {
+            width: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: white;
+        }
+
+        .stat-high .stat-icon { background-color: var(--danger-color); }
+        .stat-medium .stat-icon { background-color: var(--warning-color); }
+        .stat-low .stat-icon { background-color: var(--success-color); }
+        .stat-total .stat-icon { background-color: var(--info-color); }
+
+        .stat-content {
+            flex: 1;
+            padding: 1.25rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* 漏洞卡片 */
+        .vuln-card {
+            border-left: 4px solid;
+            transition: transform 0.2s;
+        }
+
+        .vuln-card:hover {
+            transform: translateX(5px);
+        }
+
+        .vuln-high { border-left-color: var(--danger-color); }
+        .vuln-medium { border-left-color: var(--warning-color); }
+        .vuln-low { border-left-color: var(--success-color); }
+
+        /* 标签 */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .tag-security { background-color: #ffeeee; color: var(--danger-color); }
+        .tag-performance { background-color: #fff8e6; color: var(--warning-color); }
+        .tag-maintainability { background-color: #e6fff0; color: var(--success-color); }
+
+        /* 筛选器 */
+        .filter-container {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 10px var(--shadow-color);
+        }
+
+        .filter-btn {
+            border-radius: 20px;
+            padding: 0.4rem 1.2rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+            background-color: var(--light-bg);
+            color: var(--text-secondary);
+            border: none;
+        }
+
+        .filter-btn:hover, .filter-btn:focus {
+            background-color: var(--lighter-blue);
+        }
+
+        .filter-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* 代码块 */
+        .code-block {
+            background-color: #282c34;
+            border-radius: 10px;
+            padding: 1.5rem;
+            color: #abb2bf;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .code-header {
+            background-color: #21252b;
+            padding: 0.75rem 1rem;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            color: #abb2bf;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* 时间线 */
+        .timeline {
+            position: relative;
+            margin: 2rem 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 1rem;
+            height: 100%;
+            width: 2px;
+            background: linear-gradient(to bottom, var(--primary-color), var(--secondary-color));
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 3rem;
+            margin-bottom: 2rem;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 0;
+            top: 0.5rem;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            background-color: var(--card-bg);
+            border: 2px solid var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-color);
+            z-index: 1;
+        }
+
+        .timeline-content {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px var(--shadow-color);
+        }
+
+        /* 图表容器 */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+
+        /* 标题样式 */
+        .section-title {
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            position: relative;
+            display: inline-block;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -0.5rem;
+            left: 0;
+            width: 50px;
+            height: 3px;
+            background-color: var(--primary-color);
+            border-radius: 3px;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 992px) {
+            .main-container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .content {
+                max-width: 100%;
+            }
+            .timeline::before {
+                left: 0.75rem;
+            }
+            .timeline-item {
+                padding-left: 2.5rem;
+            }
+            .timeline-dot {
+                width: 1.5rem;
+                height: 1.5rem;
+            }
+        }
+
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--light-bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--secondary-color);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="sidebar-logo">
+                <h3>{{ project_name }}</h3>
+                <p>代码审计报告</p>
+            </div>
+
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#overview" class="nav-link active">
+                        <div class="nav-icon"><i class="fas fa-tachometer-alt"></i></div>
+                        <span>概览</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#vulnerabilities" class="nav-link">
+                        <div class="nav-icon"><i class="fas fa-bug"></i></div>
+                        <span>漏洞列表</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#dependencies" class="nav-link">
+                        <div class="nav-icon"><i class="fas fa-project-diagram"></i></div>
+                        <span>依赖关系</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#timeline" class="nav-link">
+                        <div class="nav-icon"><i class="fas fa-history"></i></div>
+                        <span>分析时间线</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#recommendations" class="nav-link">
+                        <div class="nav-icon"><i class="fas fa-lightbulb"></i></div>
+                        <span>修复建议</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#statistics" class="nav-link">
+                        <div class="nav-icon"><i class="fas fa-chart-pie"></i></div>
+                        <span>统计信息</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 主内容 -->
+        <div class="content">
+            <!-- 顶部搜索栏 -->
+            <div class="top-navbar mb-4">
+                <div class="d-flex align-items-center">
+                    <div class="search-bar flex-grow-1">
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent border-0">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" id="searchInput" class="form-control form-control-lg border-0 shadow-none" placeholder="搜索漏洞或文件...">
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <button class="btn btn-outline-primary">
+                            <i class="fas fa-download me-2"></i>
+                            导出报告
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 概览部分 -->
+            <section id="overview" class="mb-5">
+                <h2 class="section-title">项目概览</h2>
+                <div class="row">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card stat-card stat-high">
+                            <div class="stat-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">{{ stats.high_count }}</div>
+                                <div class="stat-label">高危漏洞</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card stat-card stat-medium">
+                            <div class="stat-icon">
+                                <i class="fas fa-exclamation-circle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">{{ stats.medium_count }}</div>
+                                <div class="stat-label">中危漏洞</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card stat-card stat-low">
+                            <div class="stat-icon">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">{{ stats.low_count }}</div>
+                                <div class="stat-label">低危漏洞</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card stat-card stat-total">
+                            <div class="stat-icon">
+                                <i class="fas fa-file-code"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">{{ stats.file_count }}</div>
+                                <div class="stat-label">总文件数</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">漏洞类型分布</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="vulnerability-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">文件复杂度分布</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="complexity-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 漏洞列表部分 -->
+            <section id="vulnerabilities" class="mb-5">
+                <h2 class="section-title">漏洞列表</h2>
+                
+                <!-- 筛选器 -->
+                <div class="filter-container">
+                    <div class="d-flex flex-wrap align-items-center">
+                        <div class="me-3 mb-2">
+                            <label class="fw-bold me-2">过滤：</label>
+                        </div>
+                        <div class="d-flex flex-wrap">
+                            <button class="filter-btn active" data-filter="all">全部</button>
+                            <button class="filter-btn" data-filter="high">高危</button>
+                            <button class="filter-btn" data-filter="medium">中危</button>
+                            <button class="filter-btn" data-filter="low">低危</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row vulnerability-container">
+                    {% for vuln in vulnerabilities %}
+                    <div class="col-lg-4 col-md-6 vulnerability-item" data-severity="{{ vuln.severity }}">
+                        <div class="card vuln-card vuln-{{ vuln.severity }}">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h5 class="card-title mb-0">{{ vuln.title }}</h5>
+                                    <span class="badge bg-{{ vuln.badge_color }}{% if vuln.severity == 'medium' %} text-dark{% endif %}">{{ vuln.severity_display }}</span>
+                                </div>
+                                <p class="text-muted mb-3">在文件 {{ vuln.filename }} 中发现{{ vuln.type_display }}风险</p>
+                                <div class="mb-3">
+                                    {% for tag in vuln.tags %}
+                                    <span class="tag tag-{{ tag.type }}">
+                                        <i class="fas {{ tag.icon }} me-1"></i>
+                                        {{ tag.name }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                                <a href="#vuln-detail-{{ vuln.id }}" class="btn btn-sm btn-primary">
+                                    查看详情
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- 依赖关系部分 -->
+            <section id="dependencies" class="mb-5">
+                <h2 class="section-title">依赖关系</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <div id="dependency-chart"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 时间线部分 -->
+            <section id="timeline" class="mb-5">
+                <h2 class="section-title">分析时间线</h2>
+                <div class="timeline">
+                    {% for event in timeline %}
+                    <div class="timeline-item">
+                        <div class="timeline-dot">
+                            <i class="fas {{ event.icon }}"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h5 class="mb-2">{{ event.title }}</h5>
+                            <p class="text-muted mb-2">{{ event.description }}</p>
+                            <small class="text-muted">
+                                <i class="far fa-clock me-1"></i>
+                                {{ event.timestamp }}
+                            </small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- 修复建议部分 -->
+            <section id="recommendations" class="mb-5">
+                <h2 class="section-title">修复建议</h2>
+                {% for recommendation in recommendations %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">{{ recommendation.title }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="code-header">
+                            <span>修复示例：{{ recommendation.filename }}</span>
+                            <span>
+                                <i class="fas fa-copy copy-code" data-code-id="code-{{ loop.index }}"></i>
+                            </span>
+                        </div>
+                        <div class="code-block">
+                            <pre><code id="code-{{ loop.index }}">{{ recommendation.code|safe }}</code></pre>
+                        </div>
+                        <div class="mt-3">
+                            <p>{{ recommendation.description }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </section>
+
+            <!-- 统计信息部分 -->
+            <section id="statistics" class="mb-5">
+                <h2 class="section-title">统计信息</h2>
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">漏洞严重度分布</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="severity-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">最常见漏洞类型</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="vulnerability-types-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% if dependency_data %}
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    {% endif %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 导航链接激活
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+
+            // 漏洞筛选功能
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            const vulnerabilityItems = document.querySelectorAll('.vulnerability-item');
+
+            filterButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // 切换按钮状态
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // 获取筛选值
+                    const filterValue = this.getAttribute('data-filter');
+
+                    // 筛选漏洞项
+                    vulnerabilityItems.forEach(item => {
+                        if (filterValue === 'all' || item.getAttribute('data-severity') === filterValue) {
+                            item.style.display = 'block';
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+                });
+            });
+
+            // 搜索功能
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.trim().toLowerCase();
+                
+                if (searchTerm === '') {
+                    vulnerabilityItems.forEach(item => {
+                        item.style.display = 'block';
+                    });
+                    return;
+                }
+
+                vulnerabilityItems.forEach(item => {
+                    const title = item.querySelector('.card-title').textContent.toLowerCase();
+                    const description = item.querySelector('.text-muted').textContent.toLowerCase();
+                    
+                    if (title.includes(searchTerm) || description.includes(searchTerm)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+
+            // 复制代码功能
+            document.querySelectorAll('.copy-code').forEach(button => {
+                button.addEventListener('click', function() {
+                    const codeId = this.getAttribute('data-code-id');
+                    const code = document.getElementById(codeId).textContent;
+                    
+                    navigator.clipboard.writeText(code).then(() => {
+                        // 显示复制成功提示
+                        this.classList.remove('fa-copy');
+                        this.classList.add('fa-check');
+                        setTimeout(() => {
+                            this.classList.remove('fa-check');
+                            this.classList.add('fa-copy');
+                        }, 2000);
+                    });
+                });
+            });
+
+            // 漏洞类型分布图
+            const vulnerabilityCtx = document.getElementById('vulnerability-chart').getContext('2d');
+            new Chart(vulnerabilityCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: {{ vuln_types|safe }},
+                    datasets: [{
+                        data: {{ vuln_type_counts|safe }},
+                        backgroundColor: [
+                            '#ff5a5f',
+                            '#ffbe0b',
+                            '#2a86db',
+                            '#52b788',
+                            '#6c757d'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                padding: 20,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 文件复杂度分布图
+            const complexityCtx = document.getElementById('complexity-chart').getContext('2d');
+            new Chart(complexityCtx, {
+                type: 'bar',
+                data: {
+                    labels: {{ complexity_labels|safe }},
+                    datasets: [{
+                        label: '文件数量',
+                        data: {{ complexity_counts|safe }},
+                        backgroundColor: '#2a86db',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                display: true,
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 漏洞严重度分布图
+            const severityCtx = document.getElementById('severity-chart').getContext('2d');
+            new Chart(severityCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['高危', '中危', '低危'],
+                    datasets: [{
+                        data: [{{ stats.high_count }}, {{ stats.medium_count }}, {{ stats.low_count }}],
+                        backgroundColor: [
+                            '#ff5a5f',
+                            '#ffbe0b',
+                            '#52b788'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // 最常见漏洞类型图
+            const vulnTypesCtx = document.getElementById('vulnerability-types-chart').getContext('2d');
+            new Chart(vulnTypesCtx, {
+                type: 'bar',
+                data: {
+                    labels: {{ common_vuln_types|safe }},
+                    datasets: [{
+                        label: '漏洞数量',
+                        data: {{ common_vuln_counts|safe }},
+                        backgroundColor: '#80ced7',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: {
+                                display: true,
+                                drawBorder: false
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 依赖关系图
+            {% if dependency_data %}
+            const dependencyChart = echarts.init(document.getElementById('dependency-chart'));
+            dependencyChart.setOption({{ dependency_data|safe }});
+            window.addEventListener('resize', function() {
+                dependencyChart.resize();
+            });
+            {% endif %}
+
+            // 平滑滚动
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        window.scrollTo({
+                            top: target.offsetTop - 20,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html> 

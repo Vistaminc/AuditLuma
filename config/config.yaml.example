@@ -1,37 +1,76 @@
 # AuditLuma 配置文件
 
-# LLM 配置
-llm:
-  provider: "openai"  # 选项: openai, deepseek, moonshot, qwen, baichuan, zhipu, azure
-  base_url: "https://api.openai.com/v1"
-  api_key: ""  # 在此处设置 API 密钥或使用环境变量
-  model: "gpt-4-turbo-preview"  # 默认使用的模型
+# 全局设置
+global:
+  # 是否显示代理思考过程 
+  show_thinking: false
+  # 默认语言
+  language: "zh-CN"
+  # 目标项目目录
+  target_dir: "./goalfile"
+  # 报告输出目录
+  report_dir: "./reports"
+  # 报告格式
+  report_format: "html"
+
+# OpenAI 配置
+openai:
+  model: "gpt-4-turbo-preview"
+  api_key: ""
+  # 如果使用反向代理或中转，可以设置 base_url
+  base_url: "https://api.lightai.io/v1"
+  # 模型参数设置
   max_tokens: 8000
   temperature: 0.1
-  # 其他提供商示例配置
-  providers:
-    openai:
-      base_url: "https://api.openai.com/v1"
-      model: "gpt-4-turbo-preview"
-    deepseek:
-      base_url: "https://api.deepseek.com/v1"
-      model: "deepseek-chat"
-    moonshot:  # 硅基流动
-      base_url: "https://api.moonshot.cn/v1"
-      model: "moonshot-v1-8k"
-    qwen:  # 通义千问
-      base_url: "https://dashscope.aliyuncs.com/api/v1"
-      model: "qwen-max"
-    baichuan:
-      base_url: "https://api.baichuan-ai.com/v1"
-      model: "Baichuan4"
-    zhipu:  # 智谱AI
-      base_url: "https://open.bigmodel.cn/api/paas/v4"
-      model: "glm-4"
-    azure:
-      base_url: "https://YOUR_RESOURCE_NAME.openai.azure.com"
-      model: "gpt-4"
-      deployment_name: "YOUR_DEPLOYMENT_NAME"
+
+# DeepSeek 配置
+deepseek:
+  model: "deepseek-chat"
+  api_key: ""
+  base_url: "https://api.deepseek.com/v1"
+  max_tokens: 8000
+  temperature: 0.1
+
+# 硅基流动配置
+moonshot:
+  model: "moonshot-v1-8k"
+  api_key: ""
+  base_url: "https://api.moonshot.cn/v1"
+  max_tokens: 8000
+  temperature: 0.1
+
+# 通义千问配置
+qwen:
+  model: "qwen-max"
+  api_key: ""
+  base_url: "https://dashscope.aliyuncs.com/api/v1"
+  max_tokens: 8000
+  temperature: 0.1
+
+# 智谱AI配置
+zhipu:
+  model: "glm-4"
+  api_key: ""
+  base_url: "https://open.bigmodel.cn/api/paas/v4"
+  max_tokens: 8000
+  temperature: 0.1
+
+# 百度千帆配置
+baichuan:
+  model: "Baichuan4"
+  api_key: ""
+  base_url: "https://api.baichuan-ai.com/v1"
+  max_tokens: 8000
+  temperature: 0.1
+
+# 代理设置
+agent:
+  # 默认使用的LLM提供商
+  default_provider: "openai"
+  # 系统提示词
+  system_prompt: "你是一个专业的代码安全审计助手，将帮助用户分析代码中的安全漏洞"
+  # 记忆容量
+  memory_limit: 10
 
 # 项目配置
 project:
@@ -40,18 +79,22 @@ project:
   max_batch_size: 20  # 并行处理的最大文件数
   ignored_extensions: [".jpg", ".png", ".gif", ".mp3", ".mp4", ".zip", ".tar", ".gz"]
   ignored_directories: ["node_modules", "__pycache__", ".git", "dist", "build", "venv", "env"]
-  target_dir: "./goalfile"  # 默认目标项目目录
 
 # Self-RAG 配置
 self_rag:
   enabled: true
   vector_store: "faiss"
-  embedding_model: "text-embedding-3-small"  # 默认嵌入模型
+  embedding_model: "text-embedding-3-small"  # 使用OpenAI的嵌入模型构建知识库，仅用于生成嵌入
   chunk_size: 1000
   chunk_overlap: 200
   max_documents: 10000
   retrieval_k: 5
   relevance_threshold: 0.75
+
+# 工具设置
+tools:
+  # 启用的工具列表
+  enabled: ["code_analyzer", "security_scanner", "dependency_analyzer"]
 
 # 多智能体协作协议 (MCP)
 mcp:
@@ -78,6 +121,15 @@ mcp:
       type: "generator"
       priority: 5
 
+# UI设置
+ui:
+  # 主题颜色
+  theme: "blue"
+  # 是否在终端中使用彩色输出
+  use_colors: true
+  # 详细程度
+  verbosity: "normal"
+
 # 漏洞数据库
 vulnerability_db:
   sources:
@@ -94,12 +146,10 @@ output:
   graph_format: "d3"
   max_results: 100
   severity_levels: ["critical", "high", "medium", "low", "info"]
-  report_dir: "./reports"
-  report_format: "html"
 
 # 默认模型配置
 default_models:
-  code_analysis: "gpt-4-turbo-preview"  # 用于代码分析的默认模型
-  security_audit: "gpt-4-turbo-preview"  # 用于安全审计的默认模型
-  remediation: "gpt-4-turbo-preview"  # 用于生成修复建议的默认模型
-  summarization: "gpt-3.5-turbo"       # 用于总结报告的默认模型
+  code_analysis: "deepseek-chat"  # 用于代码分析的默认模型
+  security_audit: "deepseek-chat"  # 用于安全审计的默认模型
+  remediation: "deepseek-chat"    # 用于生成修复建议的默认模型
+  summarization: "deepseek-chat"        # 用于总结报告的默认模型

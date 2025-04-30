@@ -318,10 +318,52 @@ class ReportGenerator:
             # 加载HTML模板
             template = self.env.get_template("report_template.html")
             
-            # 生成依赖关系图(如果提供)
-            dependency_graph_img = ""
+            # 生成依赖关系图数据(如果提供)
+            dependency_data = ""
             if dependency_graph:
-                dependency_graph_img = self._render_dependency_graph(dependency_graph)
+                try:
+                    dependency_data = self._prepare_dependency_data(dependency_graph)
+                except Exception as e:
+                    logger.error(f"准备依赖关系图数据时出错: {e}")
+                    dependency_data = ""
+            
+            # 统计数据
+            stats = {
+                "high_count": len(vulns_by_severity.get("high", [])),
+                "medium_count": len(vulns_by_severity.get("medium", [])),
+                "low_count": len(vulns_by_severity.get("low", [])),
+                "file_count": scan_info.get("scanned_files", 0)
+            }
+            
+            # 准备漏洞类型数据
+            vuln_types = []
+            vuln_type_counts = []
+            for vuln_type, count in charts_data.get("vuln_type_counts", {}).items():
+                vuln_types.append(vuln_type)
+                vuln_type_counts.append(count)
+            
+            # 准备复杂度数据 (假设有这些数据)
+            complexity_labels = ["低", "中", "高", "非常高"]
+            complexity_counts = [20, 15, 10, 5]  # 示例数据，实际应从分析中获取
+            
+            # 准备常见漏洞类型数据 (取前5种最常见的漏洞类型)
+            common_vuln_types = []
+            common_vuln_counts = []
+            if vuln_types:
+                # 按数量排序
+                sorted_data = sorted(zip(vuln_types, vuln_type_counts), 
+                                   key=lambda x: x[1], reverse=True)[:5]
+                common_vuln_types = [item[0] for item in sorted_data]
+                common_vuln_counts = [item[1] for item in sorted_data]
+            
+            # 创建时间线数据
+            timeline_events = []
+            scan_date = scan_info.get("scan_date", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            timeline_events.append({
+                "date": scan_date,
+                "event": "完成安全扫描",
+                "description": f"发现 {len(vulnerabilities)} 个安全问题"
+            })
             
             # 准备报告数据
             report_data = {
@@ -331,8 +373,16 @@ class ReportGenerator:
                 "total_vulnerabilities": len(vulnerabilities),
                 "vulnerabilities_by_severity": vulns_by_severity,
                 "charts": charts_data.get("charts", {}),
-                "dependency_graph": dependency_graph_img,
-                "remediations": remediation_data.get("remediations", []) if remediation_data else []
+                "dependency_data": dependency_data,
+                "remediations": remediation_data.get("remediations", []) if remediation_data else [],
+                "stats": stats,
+                "vuln_types": json.dumps(vuln_types),
+                "vuln_type_counts": json.dumps(vuln_type_counts),
+                "complexity_labels": json.dumps(complexity_labels),
+                "complexity_counts": json.dumps(complexity_counts),
+                "common_vuln_types": json.dumps(common_vuln_types),
+                "common_vuln_counts": json.dumps(common_vuln_counts),
+                "timeline_events": timeline_events
             }
             
             # 渲染HTML
@@ -440,69 +490,88 @@ class ReportGenerator:
                 json.dump({"error": str(e)}, f, ensure_ascii=False, indent=2)
             return str(error_report_path)
     
-    def _render_dependency_graph(self, dependency_graph) -> str:
-        """渲染依赖关系图"""
+    def _prepare_dependency_data(self, dependency_graph) -> str:
+        """准备依赖关系图的ECharts数据"""
         try:
             import networkx as nx
             
-            plt.figure(figsize=(12, 10))
+            # 构建ECharts所需数据结构
+            nodes = []
+            links = []
             
-            # 创建节点位置
-            pos = nx.spring_layout(dependency_graph)
-            
-            # 获取节点类型
+            # 获取节点属性
             node_types = nx.get_node_attributes(dependency_graph, 'type')
+            node_names = nx.get_node_attributes(dependency_graph, 'name')
             
-            # 按类型设置节点颜色
-            node_colors = []
-            for node in dependency_graph.nodes():
-                node_type = node_types.get(node, 'unknown')
-                if node_type == 'function':
-                    node_colors.append('skyblue')
-                elif node_type == 'class':
-                    node_colors.append('lightgreen')
-                elif node_type == 'module':
-                    node_colors.append('orange')
-                else:
-                    node_colors.append('gray')
+            # 定义不同类型节点的样式
+            type_config = {
+                'function': {'color': '#2a86db', 'symbol': 'circle'},
+                'class': {'color': '#52b788', 'symbol': 'rect'},
+                'module': {'color': '#ffbe0b', 'symbol': 'triangle'},
+                'unknown': {'color': '#6c757d', 'symbol': 'diamond'}
+            }
             
-            # 获取节点标签(使用名称而不是ID)
-            node_labels = nx.get_node_attributes(dependency_graph, 'name')
+            # 创建节点数据
+            for node_id in dependency_graph.nodes():
+                node_type = node_types.get(node_id, 'unknown')
+                node_name = node_names.get(node_id, str(node_id))
+                
+                config = type_config.get(node_type, type_config['unknown'])
+                
+                nodes.append({
+                    'id': str(node_id),
+                    'name': node_name,
+                    'symbolSize': 30,
+                    'itemStyle': {'color': config['color']},
+                    'symbol': config['symbol'],
+                    'category': node_type
+                })
             
-            # 绘制节点
-            nx.draw_networkx_nodes(dependency_graph, pos, 
-                                  node_size=700, 
-                                  node_color=node_colors, 
-                                  alpha=0.8)
+            # 创建边数据
+            for source, target in dependency_graph.edges():
+                links.append({
+                    'source': str(source),
+                    'target': str(target)
+                })
             
-            # 绘制边
-            nx.draw_networkx_edges(dependency_graph, pos, 
-                                  arrowsize=15, 
-                                  arrowstyle='->', 
-                                  width=1.5, 
-                                  alpha=0.6)
+            # 创建类别数据
+            categories = [
+                {'name': 'function'},
+                {'name': 'class'},
+                {'name': 'module'},
+                {'name': 'unknown'}
+            ]
             
-            # 绘制标签
-            nx.draw_networkx_labels(dependency_graph, pos, 
-                                   labels=node_labels, 
-                                   font_size=10)
+            # 构建完整的ECharts选项
+            option = {
+                'title': {'text': '代码依赖关系图'},
+                'tooltip': {},
+                'legend': {
+                    'data': [cat['name'] for cat in categories]
+                },
+                'animationDurationUpdate': 1500,
+                'animationEasingUpdate': 'quinticInOut',
+                'series': [{
+                    'type': 'graph',
+                    'layout': 'force',
+                    'data': nodes,
+                    'links': links,
+                    'categories': categories,
+                    'roam': True,
+                    'label': {
+                        'show': True,
+                        'position': 'right',
+                        'formatter': '{b}'
+                    },
+                    'force': {
+                        'repulsion': 100
+                    }
+                }]
+            }
             
-            plt.title('代码依赖关系图')
-            plt.axis('off')  # 关闭坐标轴
-            
-            # 调整布局
-            plt.tight_layout()
-            
-            # 转换为base64编码的图像
-            buffer = io.BytesIO()
-            plt.savefig(buffer, format='png', dpi=150)
-            buffer.seek(0)
-            plt.close()
-            
-            # 转换为可嵌入HTML的数据URL
-            image_data = base64.b64encode(buffer.read()).decode('utf-8')
-            return f"data:image/png;base64,{image_data}"
+            # 转换为JSON字符串
+            return json.dumps(option)
             
         except Exception as e:
-            logger.error(f"渲染依赖关系图时出错: {e}")
+            logger.error(f"准备依赖关系图数据时出错: {e}")
             return ""
