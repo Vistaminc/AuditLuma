@@ -170,6 +170,21 @@ AuditLuma支持以下报告格式：
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 创建Pull Request
 
+## 支持与赞赏
+
+如果您觉得AuditLuma对您有帮助，欢迎通过以下方式支持我们：
+
+- 您的赞助将用于帮助我们持续改进和完善 AuditLuma！
+
+<div style="display: flex; justify-content: space-between; max-width: 600px; margin: 0 auto;">
+  <div style="flex: 1; margin-right: 20px;">
+    <img src="https://github.com/Vistaminc/Miniluma/blob/main/ui/web/static/img/zanshang/wechat.jpg"/>
+  </div>
+  <div style="flex: 1;">
+    <img src="https://github.com/Vistaminc/Miniluma/blob/main/ui/web/static/img/zanshang/zfb.jpg"/>
+  </div>
+</div>
+
 ## 📜 许可证
 
 MIT
