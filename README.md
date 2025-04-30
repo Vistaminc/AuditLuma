@@ -170,6 +170,9 @@ AuditLuma支持以下报告格式：
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 创建Pull Request
 
+## 📞 交流方式
+-QQ：1047736593
+
 ## 支持与赞赏
 
 如果您觉得AuditLuma对您有帮助，欢迎通过以下方式支持我们：
