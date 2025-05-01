@@ -22,13 +22,19 @@ from auditluma.utils import init_llm_client
 class RemediationAgent(BaseAgent):
     """修复建议智能体 - 负责生成漏洞修复建议"""
     
-    def __init__(self, agent_id: Optional[str] = None):
+    def __init__(self, agent_id: Optional[str] = None, model_spec: Optional[str] = None):
         """初始化修复建议智能体"""
-        super().__init__(agent_id, agent_type="generator")
+        super().__init__(agent_id, agent_type="generator", model_spec=model_spec)
         self.description = "提供代码修复建议和安全最佳实践"
         
+        # 初始化LLM客户端，使用特定任务的默认模型
+        # 使用指定模型或任务默认模型，格式为"model@provider"
+        self.model_spec = model_spec or Config.default_models.remediation
+        # 解析模型名称，只保存实际的模型名称部分
+        self.model_name, _ = Config.parse_model_spec(self.model_spec)
         # 初始化LLM客户端
-        self.llm_client = init_llm_client()
+        self.llm_client = init_llm_client(self.model_spec)
+        logger.info(f"修复建议智能体使用模型: {self.model_name}")
         
         # 加载修复模板
         self.remediation_templates = self._load_remediation_templates()
@@ -415,106 +421,102 @@ class RemediationAgent(BaseAgent):
         }
     
     async def _generate_specific_remediation(self, vulnerability_type: str, code: str) -> str:
-        """为特定代码和漏洞类型生成具体的修复建议"""
-        # 准备系统提示
-        system_prompt = """
-你是安全代码修复专家。请分析提供的有漏洞代码，并提供具体的修复建议。
-请确保你的修复建议:
-1. 针对特定代码给出具体的修复方案
-2. 提供修复后的代码示例
-3. 解释修复的原理和安全考虑
-4. 关注安全最佳实践和常见的防护模式
-
-你的回答应保持简洁和针对性，专注于解决具体的安全问题。
-"""
+        """为特定类型的漏洞生成具体修复建议"""
+        language = detect_language(code)
         
-        # 准备用户提示
-        user_prompt = f"""
-以下代码存在 {vulnerability_type} 类型的安全漏洞:
+        # 构建提示
+        system_prompt = """
+你是一位经验丰富的安全修复专家。请为提供的漏洞代码生成具体修复建议。
+你的建议应该:
+1. 清晰解释问题的根源
+2. 提供改进代码的具体步骤
+3. 包含修复后的代码示例
+4. 说明修复如何解决安全问题
 
-```
+请保持简洁明了，直接提供有用的修复建议。
+"""
+
+        user_prompt = f"""
+以下是包含 {vulnerability_type} 漏洞的代码:
+
+```{language}
 {code}
 ```
 
-请提供具体的修复方案和修复后的代码示例。
+请提供具体修复建议，包括修复后的代码示例。
 """
         
         try:
-            # 调用LLM生成修复建议
+            # 使用特定任务的默认模型
             response = await self.llm_client.chat.completions.create(
-                model=Config.default_models.remediation,
+                model=self.model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.2
+                temperature=0.1
+            )
+            
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"生成修复建议时出错: {e}")
+            return f"生成修复建议时出错: {str(e)}"
+    
+    async def _generate_specific_remediation_for_vuln(self, vulnerability: VulnerabilityResult) -> str:
+        """为具体的漏洞生成修复建议"""
+        if not vulnerability or not vulnerability.snippet:
+            return "无法生成修复建议：缺少漏洞代码片段"
+        
+        # 获取漏洞类型
+        vuln_type = vulnerability.vulnerability_type
+        
+        # 获取代码上下文
+        try:
+            context_docs = await self.retrieve_context(vulnerability.snippet)
+            context_text = "\n\n".join([doc.content for doc in context_docs[:3]])  # 限制上下文大小
+            
+            system_prompt = """
+你是一位精通代码安全的修复专家。请为提供的漏洞代码生成详细的修复方案。
+你的修复方案应该:
+1. 清晰解释漏洞原理
+2. 提供具体的代码修复步骤
+3. 包含修复后的代码示例
+4. 遵循安全最佳实践
+
+请直接提供最佳的修复方案，不需要解释不同的选项。确保你的修复方案与代码语言和上下文一致。
+"""
+
+            user_prompt = f"""
+以下是存在漏洞的代码片段:
+文件: {vulnerability.file_path}
+位置: {vulnerability.start_line}-{vulnerability.end_line}
+漏洞类型: {vuln_type}
+描述: {vulnerability.description}
+
+```
+{vulnerability.snippet}
+```
+
+相关上下文:
+```
+{context_text}
+```
+
+请提供详细的修复建议，包括修复后的代码。
+"""
+            
+            # 使用特定任务默认模型
+            response = await self.llm_client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.1
             )
             
             return response.choices[0].message.content
             
         except Exception as e:
-            logger.error(f"生成修复建议时出错: {e}")
-            return "无法生成具体的修复建议。请参考通用最佳实践。"
-    
-    async def _generate_specific_remediation_for_vuln(self, vulnerability: VulnerabilityResult) -> str:
-        """为特定漏洞实例生成具体的修复建议"""
-        # 获取漏洞相关的代码片段
-        code_snippet = vulnerability.snippet
-        if not code_snippet and hasattr(vulnerability, "code_unit"):
-            code_unit = vulnerability.code_unit
-            if code_unit:
-                # 提取相关代码行
-                lines = code_unit.content.splitlines()
-                start = max(0, vulnerability.start_line - code_unit.start_line)
-                end = min(len(lines), vulnerability.end_line - code_unit.start_line + 1)
-                code_snippet = "\n".join(lines[start:end])
-        
-        if not code_snippet:
-            return "无法获取漏洞代码片段，无法生成具体的修复建议。"
-        
-        # 准备系统提示
-        system_prompt = """
-你是安全代码修复专家。请分析提供的有漏洞代码，并提供具体的修复建议。
-请确保你的修复建议:
-1. 针对特定代码给出具体的修复方案
-2. 提供修复后的代码示例，标明修改的部分
-3. 解释修复的原理和安全考虑
-4. 关注安全最佳实践和常见的防护模式
-
-你的回答应保持简洁和针对性，专注于解决具体的安全问题。
-"""
-        
-        # 准备用户提示
-        user_prompt = f"""
-以下代码存在 {vulnerability.vulnerability_type} 类型的安全漏洞:
-
-```
-{code_snippet}
-```
-
-漏洞描述: {vulnerability.description}
-
-请提供具体的修复方案和修复后的代码示例。
-"""
-        
-        try:
-            # 调用LLM生成修复建议
-            response = await self.llm_client.chat.completions.create(
-                model=Config.default_models.remediation,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.2
-            )
-            
-            remediation_text = response.choices[0].message.content
-            
-            # 添加安全说明
-            remediation_text += f"\n\n**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。"
-            
-            return remediation_text
-            
-        except Exception as e:
-            logger.error(f"生成修复建议时出错: {vulnerability.id}, {e}")
-            return "无法生成具体的修复建议。请参考通用最佳实践。"
+            logger.error(f"生成漏洞修复建议出错: {e}")
+            return f"无法为此漏洞生成修复建议: {str(e)}"

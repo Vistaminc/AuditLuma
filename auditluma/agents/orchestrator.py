@@ -20,10 +20,20 @@ from auditluma.mcp.protocol import (
 class OrchestratorAgent(BaseAgent):
     """编排智能体 - 负责协调其他智能体的工作流程"""
     
-    def __init__(self, agent_id: Optional[str] = None):
+    def __init__(self, agent_id: Optional[str] = None, model_spec: Optional[str] = None):
         """初始化编排智能体"""
-        super().__init__(agent_id, agent_type="coordinator")
+        super().__init__(agent_id, agent_type="coordinator", model_spec=model_spec)
         self.description = "协调所有智能体和工作流程"
+        
+        # 初始化LLM客户端，使用特定任务的默认模型
+        from auditluma.utils import init_llm_client
+        # 使用指定模型或任务默认模型，格式为"model@provider"
+        self.model_spec = model_spec or Config.default_models.summarization
+        # 解析模型名称，只保存实际的模型名称部分
+        self.model_name, _ = Config.parse_model_spec(self.model_spec)
+        # 初始化LLM客户端
+        self.llm_client = init_llm_client(self.model_spec)
+        logger.info(f"编排智能体使用模型: {self.model_name}")
         
         # 跟踪工作流程状态
         self.workflow_status = {}

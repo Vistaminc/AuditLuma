@@ -24,14 +24,20 @@ from auditluma.rag.self_rag import self_rag
 class CodeAnalyzerAgent(BaseAgent):
     """代码分析智能体 - 负责分析代码结构和依赖关系"""
     
-    def __init__(self, agent_id: Optional[str] = None):
+    def __init__(self, agent_id: Optional[str] = None, model_spec: Optional[str] = None):
         """初始化代码分析智能体"""
-        super().__init__(agent_id, agent_type="code_analyzer")
+        super().__init__(agent_id, agent_type="code_analyzer", model_spec=model_spec)
         self.description = "分析代码结构和依赖关系"
         
-        # 初始化LLM客户端
+        # 初始化LLM客户端，使用特定任务的默认模型
         from auditluma.utils import init_llm_client
-        self.llm_client = init_llm_client()
+        # 使用指定模型或任务默认模型，格式为"model@provider"
+        self.model_spec = model_spec or Config.default_models.code_analysis
+        # 解析模型名称，只保存实际的模型名称部分
+        self.model_name, _ = Config.parse_model_spec(self.model_spec)
+        # 初始化LLM客户端
+        self.llm_client = init_llm_client(self.model_spec)
+        logger.info(f"代码分析智能体使用模型: {self.model_name}")
         
         # 依赖关系图
         self.dependency_graph = nx.DiGraph()
@@ -186,12 +192,9 @@ class CodeAnalyzerAgent(BaseAgent):
                     # 准备提示
                     prompt = self._prepare_dependency_prompt(unit, context_text)
                     
-                    # 调用LLM分析依赖，确保使用聊天模型而不是嵌入模型
-                    provider_config = Config.get_llm_provider_config(Config.agent.default_provider)
-                    chat_model = provider_config.model  # 使用配置中的聊天模型
-                    
+                    # 调用LLM分析依赖，使用特定任务的默认模型
                     response = await self.llm_client.chat.completions.create(
-                        model=chat_model,
+                        model=self.model_name,
                         messages=[
                             {"role": "system", "content": prompt["system"]},
                             {"role": "user", "content": prompt["user"]}

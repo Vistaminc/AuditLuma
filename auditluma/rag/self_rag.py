@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 import asyncio
 
 from loguru import logger
+from auditluma.config import Config
 
 # 导入可选依赖，如果不可用则提供优雅的退化
 try:
@@ -29,7 +30,6 @@ except ImportError:
     TIKTOKEN_AVAILABLE = False
     logger.warning("Tiktoken 未安装，将使用简单分词器")
 
-from auditluma.config import Config
 from auditluma.models.code import SourceFile, CodeUnit
 
 
@@ -68,7 +68,16 @@ class SimpleEmbedder:
 class OpenAIEmbedder:
     """使用OpenAI API的嵌入模型"""
     def __init__(self, model_name: str = "text-embedding-3-small", provider: str = None):
-        self.model_name = model_name
+        # 从model_name中解析模型名称和提供商（如果使用了model@provider格式）
+        parsed_model, parsed_provider = Config.parse_model_spec(model_name)
+        
+        # 如果从model_name解析出了提供商，优先使用它
+        if parsed_provider:
+            self.model_name = parsed_model
+            provider = parsed_provider
+            logger.info(f"从模型规范'{model_name}'中解析出模型名称'{parsed_model}'和提供商'{parsed_provider}'")
+        else:
+            self.model_name = model_name
         
         # 使用指定的提供商或默认提供商
         provider = provider or Config.agent.default_provider
@@ -76,11 +85,28 @@ class OpenAIEmbedder:
         self.api_key = provider_config.api_key
         self.base_url = provider_config.base_url
         
-        # 获取共享的API客户端实例以提高性能
-        from auditluma.utils import init_llm_client
-        self.client = init_llm_client(self.model_name)
+        # 初始化API客户端，禁用自动检测功能
+        import httpx
+        from openai import AsyncOpenAI
         
-        logger.info(f"初始化嵌入模型，使用提供商: {provider}")
+        # 创建带有超时设置的httpx客户端
+        timeout_settings = httpx.Timeout(
+            connect=30.0,
+            read=60.0,
+            write=30.0,
+            pool=15.0
+        )
+        http_client = httpx.AsyncClient(timeout=timeout_settings)
+        
+        # 直接使用指定提供商初始化客户端，不通过init_llm_client函数
+        self.client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            http_client=http_client,
+            max_retries=3
+        )
+        
+        logger.info(f"初始化嵌入模型: {self.model_name}, 使用提供商: {provider}")
     
     async def aembed(self, text: str) -> List[float]:
         """异步生成嵌入向量"""
@@ -272,15 +298,16 @@ class SelfRAG:
     def __init__(self):
         self.config = Config.self_rag
         
-        # 初始化嵌入模型 - 使用与聊天模型相同的提供商
-        default_provider = Config.agent.default_provider
+        # 初始化嵌入模型
+        embedding_model = self.config.embedding_model
+        
         try:
-            # 尝试使用指定的嵌入模型
-            self.embedder = OpenAIEmbedder(
-                model_name=self.config.embedding_model,
-                provider=default_provider
-            )
-            logger.info(f"使用{default_provider}嵌入模型: {self.config.embedding_model}")
+            # 使用指定的嵌入模型（支持model@provider格式）
+            self.embedder = OpenAIEmbedder(model_name=embedding_model)
+            
+            # 从配置中获取模型名称，可能已在OpenAIEmbedder中通过parse_model_spec解析
+            model_name = self.embedder.model_name
+            logger.info(f"使用嵌入模型: {model_name}")
         except Exception as e:
             logger.warning(f"无法初始化嵌入模型: {e}")
             self.embedder = SimpleEmbedder()

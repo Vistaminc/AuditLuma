@@ -13,10 +13,9 @@ global:
   # 报告格式
   report_format: "html"
 
-# OpenAI 配置
+# OpenAI 配置(通用中转配置，如果是中转链接，可适配中转的所有支持模型，不仅限于openai)
 openai:
-  model: "gpt-4-turbo-preview"
-  api_key: ""
+  api_key: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   # 如果使用反向代理或中转，可以设置 base_url
   base_url: "https://api.lightai.io/v1"
   # 模型参数设置
@@ -25,7 +24,6 @@ openai:
 
 # DeepSeek 配置
 deepseek:
-  model: "deepseek-chat"
   api_key: ""
   base_url: "https://api.deepseek.com/v1"
   max_tokens: 8000
@@ -33,7 +31,6 @@ deepseek:
 
 # 硅基流动配置
 moonshot:
-  model: "moonshot-v1-8k"
   api_key: ""
   base_url: "https://api.moonshot.cn/v1"
   max_tokens: 8000
@@ -41,7 +38,6 @@ moonshot:
 
 # 通义千问配置
 qwen:
-  model: "qwen-max"
   api_key: ""
   base_url: "https://dashscope.aliyuncs.com/api/v1"
   max_tokens: 8000
@@ -49,7 +45,6 @@ qwen:
 
 # 智谱AI配置
 zhipu:
-  model: "glm-4"
   api_key: ""
   base_url: "https://open.bigmodel.cn/api/paas/v4"
   max_tokens: 8000
@@ -57,7 +52,6 @@ zhipu:
 
 # 百度千帆配置
 baichuan:
-  model: "Baichuan4"
   api_key: ""
   base_url: "https://api.baichuan-ai.com/v1"
   max_tokens: 8000
@@ -84,7 +78,7 @@ project:
 self_rag:
   enabled: true
   vector_store: "faiss"
-  embedding_model: "text-embedding-3-small"  # 使用OpenAI的嵌入模型构建知识库，仅用于生成嵌入
+  embedding_model: "text-embedding-3-small@openai"  # 使用OpenAI的嵌入模型构建知识库
   chunk_size: 1000
   chunk_overlap: 200
   max_documents: 10000
@@ -104,22 +98,27 @@ mcp:
       description: "协调所有智能体和工作流程"
       type: "coordinator"
       priority: 1
+      model: "deepseek-chat@openai"
     - name: "code_parser"
       description: "分析代码结构并提取依赖关系"
       type: "analyzer"
       priority: 2
+      model: "deepseek-chat@openai"
     - name: "security_analyst"
       description: "识别安全漏洞"
       type: "analyst"
       priority: 3
+      model: "deepseek-chat@openai"
     - name: "code_analyzer"
       description: "分析代码结构和依赖关系"
       type: "analyzer" 
       priority: 4
+      model: "deepseek-chat@openai"
     - name: "remediation"
       description: "提供代码修复建议和最佳实践"
       type: "generator"
       priority: 5
+      model: "deepseek-chat@openai"
 
 # UI设置
 ui:
@@ -149,7 +148,7 @@ output:
 
 # 默认模型配置
 default_models:
-  code_analysis: "deepseek-chat"  # 用于代码分析的默认模型
-  security_audit: "deepseek-chat"  # 用于安全审计的默认模型
-  remediation: "deepseek-chat"    # 用于生成修复建议的默认模型
-  summarization: "deepseek-chat"        # 用于总结报告的默认模型
+  code_analysis: "deepseek-chat@deepseek"  # 用于代码分析的默认模型
+  security_audit: "deepseek-chat@deepseek"  # 用于安全审计的默认模型
+  remediation: "deepseek-chat@deepseek"    # 用于生成修复建议的默认模型
+  summarization: "deepseek-chat@deepseek"  # 用于总结报告的默认模型

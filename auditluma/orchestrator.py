@@ -51,18 +51,27 @@ class AgentOrchestrator:
         agent = None
         agent_id = f"{name}_{uuid.uuid4().hex[:6]}"
         
+        # 查找该名称智能体的MCP配置
+        agent_config = next((a for a in Config.mcp.agents if a.name == name), None)
+        model_spec = None
+        
+        # 如果找到配置并指定了模型，使用指定的模型
+        if agent_config and agent_config.model:
+            model_spec = agent_config.model
+            logger.info(f"使用MCP配置中指定的模型 '{model_spec}' 初始化智能体: {name}")
+        
         if agent_type == "analyzer":
             from auditluma.agents.code_analyzer import CodeAnalyzerAgent
-            agent = CodeAnalyzerAgent(agent_id)
+            agent = CodeAnalyzerAgent(agent_id, model_spec)
         elif agent_type == "analyst":
             from auditluma.agents.security_analyst import SecurityAnalystAgent
-            agent = SecurityAnalystAgent(agent_id)
+            agent = SecurityAnalystAgent(agent_id, model_spec)
         elif agent_type == "generator":
             from auditluma.agents.remediation import RemediationAgent
-            agent = RemediationAgent(agent_id)
+            agent = RemediationAgent(agent_id, model_spec)
         elif agent_type == "coordinator":
             from auditluma.agents.orchestrator import OrchestratorAgent
-            agent = OrchestratorAgent(agent_id)
+            agent = OrchestratorAgent(agent_id, model_spec)
         else:
             logger.warning(f"未知的智能体类型: {agent_type}")
             return None
@@ -636,3 +645,90 @@ class AgentOrchestrator:
         except Exception as e:
             logger.error(f"进行漏洞评估时出错: {e}")
             return {}
+    
+    async def generate_summary(self, vulnerabilities: List[VulnerabilityResult], assessment: Dict[str, Any]) -> str:
+        """生成安全分析结果摘要
+        
+        Args:
+            vulnerabilities: 检测到的漏洞列表
+            assessment: 漏洞评估结果
+            
+        Returns:
+            生成的摘要文本
+        """
+        # 使用协调器智能体生成摘要
+        coordinator_agent = next((a for a in self.agents.values() if a.agent_type == "coordinator"), None)
+        
+        if not coordinator_agent:
+            logger.warning("未找到编排智能体，无法生成摘要")
+            return "无法生成摘要，未找到编排智能体。"
+        
+        try:
+            # 获取严重程度统计
+            severity_counts = {}
+            for severity in SeverityLevel:
+                severity_counts[severity.name.lower()] = 0
+            
+            for vuln in vulnerabilities:
+                severity = vuln.severity.name.lower()
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            
+            # 获取漏洞类型统计
+            vuln_types = {}
+            for vuln in vulnerabilities:
+                vuln_type = vuln.vulnerability_type
+                vuln_types[vuln_type] = vuln_types.get(vuln_type, 0) + 1
+            
+            # 按漏洞数量排序
+            sorted_vuln_types = sorted(vuln_types.items(), key=lambda x: x[1], reverse=True)
+            
+            # 调用LLM API生成摘要
+            system_prompt = """
+你是一个安全报告总结专家。请根据提供的扫描结果，生成一个简明扼要的执行摘要。
+摘要应该清晰地传达以下内容：
+1. 安全扫描的总体结果概述
+2. 按严重程度分类的主要发现
+3. 最关键的漏洞类型及其潜在影响
+4. 总体风险评估
+
+请使用专业、清晰的语言，避免技术术语或行话。摘要应该是非技术人员也能理解的。
+限制在400字以内。
+"""
+
+            user_prompt = f"""
+扫描结果统计：
+漏洞总数: {len(vulnerabilities)}
+
+严重程度分布:
+- 严重: {severity_counts.get('critical', 0)}
+- 高危: {severity_counts.get('high', 0)}
+- 中危: {severity_counts.get('medium', 0)}
+- 低危: {severity_counts.get('low', 0)}
+- 信息: {severity_counts.get('info', 0)}
+
+最常见漏洞类型:
+{
+    '\\n'.join([f"- {vuln_type}: {count}件" for vuln_type, count in sorted_vuln_types[:5]])
+}
+
+风险评分: {assessment.get('risk_score', 0)}/100
+
+根据以上信息，生成安全分析执行摘要。
+"""
+            
+            response = await coordinator_agent.llm_client.chat.completions.create(
+                model=coordinator_agent.model_spec,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.1
+            )
+            
+            summary = response.choices[0].message.content
+            logger.info("生成了安全分析结果摘要")
+            return summary
+            
+        except Exception as e:
+            logger.error(f"生成摘要时出错: {e}")
+            return f"生成摘要时出错: {str(e)}"

@@ -19,14 +19,20 @@ from auditluma.rag.self_rag import self_rag
 class SecurityAnalystAgent(BaseAgent):
     """安全分析智能体 - 负责识别代码中的安全漏洞"""
     
-    def __init__(self, agent_id: Optional[str] = None):
+    def __init__(self, agent_id: Optional[str] = None, model_spec: Optional[str] = None):
         """初始化安全分析智能体"""
-        super().__init__(agent_id, agent_type="security_analyst")
+        super().__init__(agent_id, agent_type="security_analyst", model_spec=model_spec)
         self.description = "识别代码中的安全漏洞和风险"
         
-        # 初始化LLM客户端
+        # 初始化LLM客户端，使用特定任务的默认模型
         from auditluma.utils import init_llm_client
-        self.llm_client = init_llm_client()
+        # 使用指定模型或任务默认模型，格式为"model@provider"
+        self.model_spec = model_spec or Config.default_models.security_audit
+        # 解析模型名称，只保存实际的模型名称部分
+        self.model_name, _ = Config.parse_model_spec(self.model_spec)
+        # 初始化LLM客户端
+        self.llm_client = init_llm_client(self.model_spec)
+        logger.info(f"安全分析智能体使用模型: {self.model_name}")
         
         # 加载安全知识库
         self.security_knowledge = self._load_security_knowledge()
@@ -149,12 +155,12 @@ class SecurityAnalystAgent(BaseAgent):
         # 准备提示
         prompt = self._prepare_security_prompt(code_unit, context_text)
         
-        # 调用LLM进行安全分析
+        # 调用LLM进行安全分析，使用特定任务的默认模型
         logger.debug(f"发送安全分析提示到LLM，代码单元: {code_unit.id}")
         
         try:
             response = await self.llm_client.chat.completions.create(
-                model=Config.default_models.security_audit,
+                model=self.model_name,
                 messages=[
                     {"role": "system", "content": prompt["system"]},
                     {"role": "user", "content": prompt["user"]}
@@ -252,38 +258,30 @@ class SecurityAnalystAgent(BaseAgent):
         }
     
     async def _quick_security_analysis(self, code: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """快速分析代码片段的安全问题"""
-        # 准备系统提示
+        """对单个代码片段进行快速安全分析"""
+        # 准备提示
         system_prompt = """
-你是一个专业的代码安全审计专家。请分析提供的代码片段，识别潜在的安全漏洞和风险。
-关注以下安全问题:
-- 输入验证缺失
-- 授权和认证问题
-- 注入漏洞 (SQL, NoSQL, 命令注入等)
-- 跨站脚本 (XSS)
-- 敏感数据泄露
-- 安全配置问题
-- 加密不当
-- 逻辑缺陷
+你是一位安全分析专家，请对提供的代码进行安全漏洞分析。
+请仔细检查可能存在的安全问题并提供详细分析：
+1. 识别潜在的安全漏洞
+2. 确定每个漏洞的严重程度(严重/高/中/低/信息)
+3. 提供改进建议
 
-请提供具体的漏洞描述，标明漏洞的位置和类型，并给出修复建议。使用基于事实和代码分析的方式回答，避免低置信度的猜测。
+请以安全专家的眼光分析代码，提供具体、实用的建议。
 """
-        
-        # 准备用户提示
+
         user_prompt = f"""
-请分析以下代码片段中的安全漏洞:
+请分析以下代码片段的安全问题：
 
 ```
 {code}
 ```
-
-如果你识别到相关的安全问题，请指出代码中的问题，并提供修复建议。
 """
         
-        # 调用LLM
         try:
+            # 使用特定任务的默认模型
             response = await self.llm_client.chat.completions.create(
-                model=Config.default_models.security_audit,
+                model=self.model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -293,13 +291,21 @@ class SecurityAnalystAgent(BaseAgent):
             
             analysis = response.choices[0].message.content
             
+            # 提取安全问题
+            issues = self._extract_security_issues(analysis)
+            
             return {
-                "analysis": analysis,
-                "detected_issues": self._extract_security_issues(analysis)
+                "issues": issues,
+                "raw_analysis": analysis
             }
+            
         except Exception as e:
             logger.error(f"快速安全分析出错: {e}")
-            return {"error": str(e)}
+            return {
+                "issues": [],
+                "raw_analysis": f"分析失败: {str(e)}",
+                "error": str(e)
+            }
     
     def _prepare_security_prompt(self, code_unit: CodeUnit, context_text: str) -> Dict[str, str]:
         """准备安全分析提示"""

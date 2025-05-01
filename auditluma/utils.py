@@ -401,7 +401,7 @@ def init_llm_client(model: Optional[str] = None) -> Any:
     根据配置初始化不同提供商的LLM客户端
     
     Args:
-        model: 可选的模型名称，如果提供，会自动检测提供商
+        model: 可选的模型名称，支持"model@provider"格式指定提供商
     
     Returns:
         LLM客户端实例
@@ -416,20 +416,30 @@ def init_llm_client(model: Optional[str] = None) -> Any:
         
     from openai import AsyncOpenAI
     
-    # 确定使用的提供商
-    provider_name = Config.agent.default_provider
-    
-    # 如果提供了模型名称，尝试检测提供商
+    # 解析模型规范，如果提供了模型名称
+    model_name = ""
+    provider_name = ""
     if model:
-        detected_provider = detect_provider_from_model(model)
-        logger.info(f"根据模型名 '{model}' 检测到提供商: {detected_provider}")
-        provider_name = detected_provider
+        model_name, provider_from_model = Config.parse_model_spec(model)
+        # 如果模型指定了提供商，使用它
+        if provider_from_model:
+            provider_name = provider_from_model
+            logger.info(f"使用模型规范中指定的提供商: {provider_name}")
+    
+    # 如果未从模型中指定提供商，使用默认提供商
+    if not provider_name:
+        provider_name = Config.agent.default_provider
+        logger.info(f"使用配置中的默认提供商: {provider_name}")
+    
+    # 如果没有指定模型名称，这是一个错误
+    if not model_name:
+        logger.error(f"必须指定模型名称，格式为'model@provider'")
+        raise ValueError("初始化LLM客户端时缺少模型名称")
     
     # 获取提供商配置
     provider_config = Config.get_llm_provider_config(provider_name)
     base_url = provider_config.base_url
     api_key = provider_config.api_key
-    model_name = model or provider_config.model
     
     # 如果API密钥未在配置中设置，尝试从环境变量获取
     if not api_key:

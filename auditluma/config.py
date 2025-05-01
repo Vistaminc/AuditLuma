@@ -2,7 +2,7 @@
 AuditLuma 的配置模块
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel, Field
 import yaml
 from pathlib import Path
@@ -34,7 +34,6 @@ class GlobalConfig(BaseModel):
 
 class LLMProviderConfig(BaseModel):
     """LLM提供商配置基类"""
-    model: str = ""
     api_key: str = ""
     base_url: str = ""
     max_tokens: int = 8000
@@ -44,44 +43,37 @@ class LLMProviderConfig(BaseModel):
         """获取LLM客户端配置"""
         return {
             "api_key": self.api_key,
-            "base_url": self.base_url,
-            "model": self.model
+            "base_url": self.base_url
         }
 
 
 class OpenAIConfig(LLMProviderConfig):
     """OpenAI专用配置"""
-    model: str = "gpt-4-turbo-preview"
     base_url: str = "https://api.openai.com/v1"
 
 
 class DeepSeekConfig(LLMProviderConfig):
     """DeepSeek专用配置"""
-    model: str = "deepseek-chat"
     base_url: str = "https://api.deepseek.com/v1"
 
 
 class MoonshotConfig(LLMProviderConfig):
     """硅基流动专用配置"""
-    model: str = "moonshot-v1-8k"
     base_url: str = "https://api.moonshot.cn/v1"
 
 
 class QwenConfig(LLMProviderConfig):
     """通义千问专用配置"""
-    model: str = "qwen-max"
     base_url: str = "https://dashscope.aliyuncs.com/api/v1"
 
 
 class ZhipuConfig(LLMProviderConfig):
     """智谱AI专用配置"""
-    model: str = "glm-4"
     base_url: str = "https://open.bigmodel.cn/api/paas/v4"
 
 
 class BaichuanConfig(LLMProviderConfig):
     """百度千帆专用配置"""
-    model: str = "Baichuan4"
     base_url: str = "https://api.baichuan-ai.com/v1"
 
 
@@ -110,6 +102,7 @@ class MCPAgentConfig(BaseModel):
     description: str
     type: str
     priority: int
+    model: str = ""  # 智能体使用的模型，格式为"model@provider"
 
 
 class MCPConfig(BaseModel):
@@ -300,6 +293,31 @@ class Config:
     def get_report_format(cls) -> str:
         """获取报告格式"""
         return cls.global_config.report_format
+
+    @classmethod
+    def parse_model_spec(cls, model_spec: str) -> Tuple[str, str]:
+        """解析模型规范，从形如"model@provider"的格式中提取模型名称和提供商
+        
+        Args:
+            model_spec: 模型规范字符串，如"deepseek-chat@deepseek"
+            
+        Returns:
+            包含模型名称和提供商的元组 (model_name, provider_name)
+        """
+        if not model_spec:
+            return "", ""
+            
+        # 检查是否包含@符号
+        if "@" in model_spec:
+            model_name, provider_name = model_spec.split("@", 1)
+            return model_name.strip(), provider_name.strip()
+        
+        # 如果没有@符号，使用自动检测提供商的函数
+        from auditluma.utils import detect_provider_from_model
+        model_name = model_spec.strip()
+        provider_name = detect_provider_from_model(model_name)
+        
+        return model_name, provider_name
 
 
 def load_config(config_path: str = "./config/config.yaml") -> None:

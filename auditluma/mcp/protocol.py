@@ -198,6 +198,24 @@ class AgentCoordinator:
         """按类型获取智能体"""
         return [agent for agent in self.agents.values() if agent["type"] == agent_type]
     
+    def get_agent_by_type(self, agent_type: str) -> Optional[str]:
+        """获取指定类型的第一个可用智能体ID
+        
+        Args:
+            agent_type: 智能体类型
+            
+        Returns:
+            智能体ID，如果找不到则返回None
+        """
+        agents = self.get_agents_by_type(agent_type)
+        if agents:
+            # 返回第一个空闲的智能体，如果没有空闲的，则返回第一个
+            idle_agents = [a for a in agents if a["status"] == "idle"]
+            if idle_agents:
+                return idle_agents[0]["id"]
+            return agents[0]["id"]
+        return None
+    
     async def create_task(self, 
                        task_id: str, 
                        task_type: str, 

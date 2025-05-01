@@ -22,14 +22,21 @@ from auditluma.rag.self_rag import self_rag, Document
 class BaseAgent(ABC):
     """所有智能体的基类"""
     
-    def __init__(self, agent_id: Optional[str] = None, agent_type: str = "base"):
-        """初始化基础智能体"""
+    def __init__(self, agent_id: Optional[str] = None, agent_type: str = "base", model_spec: Optional[str] = None):
+        """初始化基础智能体
+        
+        Args:
+            agent_id: 可选的智能体ID，如果不提供则自动生成
+            agent_type: 智能体类型
+            model_spec: 可选的模型规范，格式为"model@provider"
+        """
         self.agent_id = agent_id or f"{agent_type}_{uuid.uuid4().hex[:8]}"
         self.agent_type = agent_type
         self.description = "基础智能体"
         self.task_queue = asyncio.Queue()
         self.running = False
         self.callback_handlers: Dict[MessageType, List[Callable]] = {}
+        self.model_spec = model_spec
         
         # 注册到协调器
         agent_coordinator.register_agent(
