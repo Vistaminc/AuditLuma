@@ -4,340 +4,795 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AuditLuma安全审计报告 - {{ project_name }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary-color: #4a6baf;
-            --secondary-color: #6c757d;
-            --success-color: #28a745;
-            --danger-color: #dc3545;
-            --warning-color: #ffc107;
-            --info-color: #17a2b8;
-            --light-color: #f8f9fa;
-            --dark-color: #343a40;
-            --critical-color: #ff0000;
-            --high-color: #ff7f00;
-            --medium-color: #ffff00;
-            --low-color: #00ff00;
+            /* 主色调 */
+            --primary-color: #00c0f5;
+            --primary-dark: #0078d7;
+            --primary-light: #b6e3ff;
+            
+            /* 辅助色 */
+            --secondary-color: #586f7c;
+            --background-color: #f8fbff;
+            --card-bg: #ffffff;
+            
+            /* 危险等级颜色 */
+            --critical-color: #ff3a3a;
+            --high-color: #ff6b6b;
+            --medium-color: #ffbd59;
+            --low-color: #7ad84e;
+            --info-color: #00c0f5;
+            
+            /* 文字颜色 */
+            --text-primary: #2b3a4d;
+            --text-secondary: #586f7c;
+            --text-light: #f8f9fa;
+            
+            /* 其他 */
+            --border-color: #e5e9ef;
+            --shadow: 0 2px 8px rgba(0,120,215,0.08);
+            --hover-shadow: 0 4px 12px rgba(0,120,215,0.15);
+            --card-radius: 8px;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: var(--text-primary);
+            background-color: var(--background-color);
             margin: 0;
             padding: 0;
-            background-color: #f8f9fa;
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1280px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 0;
+            background-color: transparent;
         }
         
         header {
-            background-color: var(--primary-color);
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
             color: white;
-            padding: 20px;
+            padding: 30px;
+            border-radius: 0 0 var(--card-radius) var(--card-radius);
             margin-bottom: 30px;
-            border-radius: 5px;
+            box-shadow: var(--shadow);
+        }
+        
+        .dashboard {
+            display: flex;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .sidebar {
+            width: 280px;
+            position: sticky;
+            top: 20px;
+            align-self: flex-start;
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-right: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .main-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: var(--hover-shadow);
+        }
+        
+        .card-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .card-body {
+            padding: 20px;
         }
         
         h1, h2, h3, h4 {
-            color: var(--primary-color);
-            margin-top: 1.5em;
-            margin-bottom: 0.8em;
+            color: var(--primary-dark);
             font-weight: 600;
         }
         
         h1 {
-            font-size: 2.2em;
-            border-bottom: 2px solid var(--primary-color);
-            padding-bottom: 10px;
+            font-size: 2em;
+            margin: 0;
             color: white;
-            margin-top: 0;
         }
         
         h2 {
-            font-size: 1.8em;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
+            font-size: 1.5em;
+            margin-top: 0;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
         }
         
         h3 {
-            font-size: 1.5em;
-        }
-        
-        h4 {
-            font-size: 1.3em;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        th {
-            background-color: var(--primary-color);
-            color: white;
-        }
-        
-        tr:hover {
-            background-color: #f5f5f5;
-        }
-        
-        .summary-box {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .summary-item {
-            flex: 1;
-            min-width: 200px;
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.1);
-            text-align: center;
-            background-color: white;
-        }
-        
-        .summary-item h3 {
+            font-size: 1.2em;
             margin-top: 0;
-            color: var(--secondary-color);
+            margin-bottom: 15px;
         }
         
-        .summary-item .count {
-            font-size: 2em;
-            font-weight: bold;
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            padding: 20px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+        
+        .stat-card .icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
             color: var(--primary-color);
         }
         
-        .severity-critical { color: var(--critical-color); }
-        .severity-high { color: var(--high-color); }
-        .severity-medium { color: var(--medium-color); background-color: #333; }
-        .severity-low { color: var(--low-color); }
-        .severity-info { color: var(--info-color); }
+        .stat-card .count {
+            font-size: 2em;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card .label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+        
+        .severity-critical .count { color: var(--critical-color); }
+        .severity-high .count { color: var(--high-color); }
+        .severity-medium .count { color: var(--medium-color); }
+        .severity-low .count { color: var(--low-color); }
+        .severity-info .count { color: var(--info-color); }
         
         .severity-badge {
             display: inline-block;
-            padding: 5px 10px;
-            border-radius: 3px;
+            padding: 4px 8px;
+            border-radius: 4px;
             color: white;
-            font-weight: bold;
-            text-transform: uppercase;
+            font-weight: 500;
             font-size: 0.8em;
+            text-transform: uppercase;
         }
         
         .badge-critical { background-color: var(--critical-color); }
         .badge-high { background-color: var(--high-color); }
-        .badge-medium { background-color: var(--medium-color); color: black; }
-        .badge-low { background-color: var(--low-color); color: black; }
+        .badge-medium { background-color: var(--medium-color); color: #333; }
+        .badge-low { background-color: var(--low-color); }
         .badge-info { background-color: var(--info-color); }
         
-        .vuln-card {
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            overflow: hidden;
+        /* 导航菜单 */
+        .nav-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px 0;
         }
         
-        .vuln-card .card-header {
+        .nav-menu li {
+            margin-bottom: 5px;
+        }
+        
+        .nav-menu a {
+            display: block;
             padding: 10px 15px;
-            border-bottom: 1px solid #ddd;
-            background-color: #f8f9fa;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            color: var(--text-primary);
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
         }
         
-        .vuln-card .card-body {
+        .nav-menu a:hover,
+        .nav-menu a.active {
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+        }
+        
+        .nav-menu a i {
+            margin-right: 8px;
+            width: 20px;
+            text-align: center;
+        }
+        
+        /* 过滤器 */
+        .filters {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
             padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
         }
         
-        .vuln-card .card-footer {
-            border-top: 1px solid #ddd;
-            padding: 10px 15px;
-            background-color: #f8f9fa;
+        .filter-group {
+            margin-bottom: 15px;
         }
         
+        .filter-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        .filter-group h4 {
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .filter-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .filter-checkbox {
+            display: none;
+        }
+        
+        .filter-label {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background-color: #f0f0f0;
+            color: var(--text-secondary);
+        }
+        
+        .filter-checkbox:checked + .filter-label {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .filter-label-critical { border: 1px solid var(--critical-color); }
+        .filter-label-high { border: 1px solid var(--high-color); }
+        .filter-label-medium { border: 1px solid var(--medium-color); }
+        .filter-label-low { border: 1px solid var(--low-color); }
+        .filter-label-info { border: 1px solid var(--info-color); }
+        
+        .filter-checkbox:checked + .filter-label-critical { background-color: var(--critical-color); }
+        .filter-checkbox:checked + .filter-label-high { background-color: var(--high-color); }
+        .filter-checkbox:checked + .filter-label-medium { background-color: var(--medium-color); color: #333; }
+        .filter-checkbox:checked + .filter-label-low { background-color: var(--low-color); }
+        .filter-checkbox:checked + .filter-label-info { background-color: var(--info-color); }
+        
+        /* 搜索框 */
+        .search-box {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 10px 15px 10px 35px;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 0.9em;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(58, 123, 213, 0.15);
+        }
+        
+        .search-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--secondary-color);
+        }
+        
+        /* 代码部分 */
         .code-section {
-            background-color: #f4f4f4;
+            background-color: #292d3e;
             padding: 15px;
             border-radius: 5px;
             margin: 10px 0;
             overflow-x: auto;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            color: #d0d0d0;
+            position: relative;
+        }
+        
+        .code-header {
+            background-color: #1a1c25;
+            padding: 8px 15px;
+            border-radius: 5px 5px 0 0;
+            color: #d0d0d0;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: -5px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .code-path {
+            opacity: 0.7;
+        }
+        
+        .code-copy {
+            background: none;
+            border: none;
+            color: #a0a0a0;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        
+        .code-copy:hover {
+            color: white;
         }
         
         .code-line {
             display: block;
             white-space: pre;
+            line-height: 1.5;
         }
         
+        .line-number {
+            display: inline-block;
+            width: 30px;
+            margin-right: 10px;
+            text-align: right;
+            color: #606060;
+            user-select: none;
+        }
+        
+        /* 文件路径 */
         .file-path {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: #eee;
-            padding: 3px 5px;
+            font-family: 'Fira Code', monospace;
+            background-color: rgba(0,0,0,0.05);
+            padding: 3px 8px;
             border-radius: 3px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            display: inline-block;
         }
         
+        /* 图表容器 */
         .charts-section {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
         
         .chart-container {
-            flex: 1;
-            min-width: 300px;
-            background-color: white;
-            border-radius: 5px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.1);
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .chart-img {
-            width: 100%;
-            height: auto;
-            max-width: 100%;
-        }
-        
-        .dependency-graph {
-            text-align: center;
-            margin: 20px 0;
-        }
-        
-        .dependency-graph img {
-            max-width: 100%;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        
-        .remediation-section {
-            background-color: #f9f9f9;
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow);
             padding: 20px;
-            border-radius: 5px;
-            margin-top: 10px;
+            height: 300px;
         }
         
+        /* 漏洞卡片 */
+        .vuln-card {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 15px;
+            overflow: hidden;
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .vuln-card .card-body {
+            padding: 20px;
+        }
+        
+        .vuln-card .card-footer {
+            background-color: rgba(0,0,0,0.02);
+            border-top: 1px solid var(--border-color);
+            padding: 15px 20px;
+        }
+        
+        /* 折叠状态 */
+        .vuln-card:not(.expanded) .card-body,
+        .vuln-card:not(.expanded) .card-footer {
+            display: none;
+        }
+        
+        .vuln-card.expanded {
+            box-shadow: var(--hover-shadow);
+        }
+        
+        .vuln-card .card-header {
+            cursor: pointer;
+            position: relative;
+            padding-right: 40px;
+        }
+        
+        .vuln-card .card-header:after {
+            content: '\f107';
+            font-family: 'Font Awesome 5 Free';
+            font-weight: 900;
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.2s ease;
+        }
+        
+        .vuln-card.expanded .card-header:after {
+            transform: translateY(-50%) rotate(180deg);
+        }
+        
+        /* 页脚 */
         footer {
             text-align: center;
+            padding: 30px 20px;
+            margin-top: 50px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+        }
+        
+        footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        /* 推荐建议网格 */
+        .recommendations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .recommendation-item {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
             padding: 20px;
-            margin-top: 30px;
-            border-top: 1px solid #eee;
-            color: var(--secondary-color);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .recommendation-item:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+        
+        .recommendation-item .icon {
+            font-size: 2em;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+        
+        .recommendation-item h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: var(--primary-dark);
+        }
+        
+        .recommendation-item p {
+            color: var(--text-secondary);
+            margin: 0;
+            font-size: 0.9em;
+        }
+        
+        /* 时间线 */
+        .timeline {
+            position: relative;
+            margin: 20px 0;
+            padding-left: 20px;
+        }
+        
+        .timeline:before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 2px;
+            background-color: var(--primary-light);
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 30px;
+        }
+        
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            left: -24px;
+            top: 5px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            border: 2px solid var(--primary-light);
+        }
+        
+        .timeline-content {
+            padding-left: 15px;
+        }
+        
+        .timeline-content h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: var(--primary-dark);
+        }
+        
+        .timeline-content p {
+            margin-bottom: 10px;
+        }
+        
+        /* 按钮 */
+        .btn {
+            display: inline-block;
+            padding: 6px 12px;
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+        }
+        
+        .btn:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn i {
+            margin-right: 5px;
+        }
+        
+        /* 计数徽章 */
+        .count-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            font-size: 0.8em;
+            margin-left: 8px;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 992px) {
+            .dashboard {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                position: static;
+                margin-right: 0;
+                margin-bottom: 20px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            }
+            
+            .recommendations-grid {
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 10px;
+            }
+            
+            header {
+                padding: 20px;
+            }
+            
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-card .count {
+                font-size: 1.5em;
+            }
+            
+            .recommendations-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>AuditLuma安全审计报告</h1>
+            <h1><i class="fas fa-shield-alt"></i> AuditLuma安全审计报告</h1>
             <p>项目名称: {{ project_name }} | 扫描日期: {{ scan_date }}</p>
         </header>
         
-        <section id="summary">
-            <h2>漏洞摘要</h2>
-            <div class="summary-box">
-                <div class="summary-item">
-                    <h3>扫描文件数</h3>
+        <div class="dashboard">
+            <!-- 侧边栏导航和过滤器 -->
+            <div class="sidebar">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="搜索漏洞..." />
+                </div>
+                
+                <ul class="nav-menu">
+                    <li><a href="#overview" class="active"><i class="fas fa-home"></i> 概览</a></li>
+                    <li><a href="#vulnerabilities"><i class="fas fa-bug"></i> 漏洞详情</a></li>
+                    <li><a href="#dependency"><i class="fas fa-project-diagram"></i> 依赖关系</a></li>
+                    <li><a href="#recommendations"><i class="fas fa-lightbulb"></i> 安全建议</a></li>
+                    <li><a href="#statistics"><i class="fas fa-chart-pie"></i> 统计数据</a></li>
+                </ul>
+                
+                <div class="filters">
+                    <h3>漏洞过滤器</h3>
+                    
+                    <div class="filter-group">
+                        <h4>严重程度</h4>
+                        <div class="filter-options">
+                            <input type="checkbox" id="filter-critical" class="filter-checkbox" checked data-severity="critical">
+                            <label for="filter-critical" class="filter-label filter-label-critical">严重</label>
+                            
+                            <input type="checkbox" id="filter-high" class="filter-checkbox" checked data-severity="high">
+                            <label for="filter-high" class="filter-label filter-label-high">高危</label>
+                            
+                            <input type="checkbox" id="filter-medium" class="filter-checkbox" checked data-severity="medium">
+                            <label for="filter-medium" class="filter-label filter-label-medium">中危</label>
+                            
+                            <input type="checkbox" id="filter-low" class="filter-checkbox" checked data-severity="low">
+                            <label for="filter-low" class="filter-label filter-label-low">低危</label>
+                            
+                            <input type="checkbox" id="filter-info" class="filter-checkbox" checked data-severity="info">
+                            <label for="filter-info" class="filter-label filter-label-info">信息</label>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <h4>漏洞类型</h4>
+                        <div id="vulnTypeFilters" class="filter-options">
+                            <!-- 将由JavaScript根据实际漏洞类型动态生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 主要内容区 -->
+            <div class="main-content">
+                <!-- 概览部分 -->
+                <section id="overview" class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-home"></i> 项目概览</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="icon"><i class="fas fa-file-code"></i></div>
                     <div class="count">{{ scan_info.scanned_files }}</div>
+                                <div class="label">扫描文件数</div>
                 </div>
-                <div class="summary-item">
-                    <h3>扫描代码行数</h3>
+                            
+                            <div class="stat-card">
+                                <div class="icon"><i class="fas fa-code"></i></div>
                     <div class="count">{{ scan_info.scanned_lines }}</div>
+                                <div class="label">扫描代码行数</div>
                 </div>
-                <div class="summary-item">
-                    <h3>扫描时长</h3>
+                            
+                            <div class="stat-card">
+                                <div class="icon"><i class="fas fa-clock"></i></div>
                     <div class="count">{{ scan_info.scan_duration }}</div>
+                                <div class="label">扫描时长</div>
                 </div>
-                <div class="summary-item">
-                    <h3>发现漏洞总数</h3>
+                            
+                            <div class="stat-card">
+                                <div class="icon"><i class="fas fa-bug"></i></div>
                     <div class="count">{{ total_vulnerabilities }}</div>
+                                <div class="label">漏洞总数</div>
                 </div>
             </div>
             
-            <div class="summary-box">
-                <div class="summary-item">
-                    <h3>严重漏洞</h3>
-                    <div class="count severity-critical">{{ vulnerabilities_by_severity.critical|length }}</div>
+                        <div class="stats-grid">
+                            <div class="stat-card severity-critical">
+                                <div class="icon"><i class="fas fa-skull-crossbones"></i></div>
+                                <div class="count">{{ vulnerabilities_by_severity.critical|length }}</div>
+                                <div class="label">严重漏洞</div>
                 </div>
-                <div class="summary-item">
-                    <h3>高危漏洞</h3>
-                    <div class="count severity-high">{{ vulnerabilities_by_severity.high|length }}</div>
+                            
+                            <div class="stat-card severity-high">
+                                <div class="icon"><i class="fas fa-radiation"></i></div>
+                                <div class="count">{{ vulnerabilities_by_severity.high|length }}</div>
+                                <div class="label">高危漏洞</div>
                 </div>
-                <div class="summary-item">
-                    <h3>中危漏洞</h3>
-                    <div class="count severity-medium">{{ vulnerabilities_by_severity.medium|length }}</div>
+                            
+                            <div class="stat-card severity-medium">
+                                <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                                <div class="count">{{ vulnerabilities_by_severity.medium|length }}</div>
+                                <div class="label">中危漏洞</div>
                 </div>
-                <div class="summary-item">
-                    <h3>低危漏洞</h3>
-                    <div class="count severity-low">{{ vulnerabilities_by_severity.low|length }}</div>
+                            
+                            <div class="stat-card severity-low">
+                                <div class="icon"><i class="fas fa-info-circle"></i></div>
+                                <div class="count">{{ vulnerabilities_by_severity.low|length }}</div>
+                                <div class="label">低危漏洞</div>
                 </div>
-                <div class="summary-item">
-                    <h3>信息提醒</h3>
-                    <div class="count severity-info">{{ vulnerabilities_by_severity.info|length }}</div>
                 </div>
-            </div>
-        </section>
         
-        <section id="charts">
-            <h2>漏洞统计图表</h2>
+                        <!-- 图表区域 -->
             <div class="charts-section">
-                {% if charts.severity_chart %}
                 <div class="chart-container">
-                    <h3>按严重程度分布</h3>
-                    <img src="{{ charts.severity_chart }}" alt="Severity Distribution" class="chart-img" />
+                                <canvas id="severity-chart"></canvas>
                 </div>
-                {% endif %}
-                
-                {% if charts.vuln_type_chart %}
                 <div class="chart-container">
-                    <h3>按漏洞类型分布</h3>
-                    <img src="{{ charts.vuln_type_chart }}" alt="Vulnerability Type Distribution" class="chart-img" />
+                                <canvas id="vulnerability-chart"></canvas>
                 </div>
-                {% endif %}
-                
-                {% if charts.file_chart %}
-                <div class="chart-container">
-                    <h3>按文件分布</h3>
-                    <img src="{{ charts.file_chart }}" alt="File Distribution" class="chart-img" />
                 </div>
-                {% endif %}
             </div>
         </section>
         
-        {% if dependency_graph %}
-        <section id="dependency-graph">
-            <h2>代码依赖关系图</h2>
-            <div class="dependency-graph">
-                <img src="{{ dependency_graph }}" alt="Code Dependency Graph" />
+                <!-- 漏洞详情部分 -->
+                <section id="vulnerabilities" class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-bug"></i> 漏洞详情</h2>
+                        <div class="actions">
+                            <button id="expandAll" class="btn"><i class="fas fa-expand-alt"></i> 展开全部</button>
+                            <button id="collapseAll" class="btn"><i class="fas fa-compress-alt"></i> 折叠全部</button>
             </div>
-            <p class="chart-note">* 此图显示了代码组件之间的依赖关系，可用于理解代码结构和识别潜在的安全薄弱点。</p>
-        </section>
-        {% endif %}
-        
-        <section id="vulnerabilities">
-            <h2>漏洞详情</h2>
-            
+                    </div>
+                    <div class="card-body">
+                        <div id="vulnerabilities-container">
+                            <!-- 严重漏洞 -->
             {% if vulnerabilities_by_severity.critical|length > 0 %}
-            <h3>严重漏洞 ({{ vulnerabilities_by_severity.critical|length }})</h3>
+                            <div class="severity-section" data-severity="critical">
+                                <h3><i class="fas fa-skull-crossbones"></i> 严重漏洞 <span class="count-badge">{{ vulnerabilities_by_severity.critical|length }}</span></h3>
             {% for vuln in vulnerabilities_by_severity.critical %}
-            <div class="vuln-card">
+                                <div class="vuln-card" data-severity="critical" data-type="{{ vuln.vulnerability_type }}">
                 <div class="card-header">
                     <span>{{ vuln.vulnerability_type }}</span>
                     <span class="severity-badge badge-critical">严重</span>
@@ -349,8 +804,12 @@
                     <p><strong>描述:</strong> {{ vuln.description }}</p>
                     
                     {% if vuln.snippet %}
+                                        <div class="code-header">
+                                            <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
+                                        </div>
                     <div class="code-section">
-                        <pre>{{ vuln.snippet }}</pre>
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -358,7 +817,7 @@
                 {% for remediation in remediations %}
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
-                        <h4>修复建议</h4>
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
                         <div class="remediation-section">
                             {{ remediation.specific_remediation|safe }}
                         </div>
@@ -367,12 +826,15 @@
                 {% endfor %}
             </div>
             {% endfor %}
+                            </div>
             {% endif %}
             
+                            <!-- 高危漏洞 -->
             {% if vulnerabilities_by_severity.high|length > 0 %}
-            <h3>高危漏洞 ({{ vulnerabilities_by_severity.high|length }})</h3>
+                            <div class="severity-section" data-severity="high">
+                                <h3><i class="fas fa-radiation"></i> 高危漏洞 <span class="count-badge">{{ vulnerabilities_by_severity.high|length }}</span></h3>
             {% for vuln in vulnerabilities_by_severity.high %}
-            <div class="vuln-card">
+                                <div class="vuln-card" data-severity="high" data-type="{{ vuln.vulnerability_type }}">
                 <div class="card-header">
                     <span>{{ vuln.vulnerability_type }}</span>
                     <span class="severity-badge badge-high">高危</span>
@@ -384,8 +846,12 @@
                     <p><strong>描述:</strong> {{ vuln.description }}</p>
                     
                     {% if vuln.snippet %}
+                                        <div class="code-header">
+                                            <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
+                                        </div>
                     <div class="code-section">
-                        <pre>{{ vuln.snippet }}</pre>
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -393,7 +859,7 @@
                 {% for remediation in remediations %}
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
-                        <h4>修复建议</h4>
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
                         <div class="remediation-section">
                             {{ remediation.specific_remediation|safe }}
                         </div>
@@ -402,12 +868,15 @@
                 {% endfor %}
             </div>
             {% endfor %}
+                            </div>
             {% endif %}
             
+                            <!-- 中危漏洞 -->
             {% if vulnerabilities_by_severity.medium|length > 0 %}
-            <h3>中危漏洞 ({{ vulnerabilities_by_severity.medium|length }})</h3>
+                            <div class="severity-section" data-severity="medium">
+                                <h3><i class="fas fa-exclamation-triangle"></i> 中危漏洞 <span class="count-badge">{{ vulnerabilities_by_severity.medium|length }}</span></h3>
             {% for vuln in vulnerabilities_by_severity.medium %}
-            <div class="vuln-card">
+                                <div class="vuln-card" data-severity="medium" data-type="{{ vuln.vulnerability_type }}">
                 <div class="card-header">
                     <span>{{ vuln.vulnerability_type }}</span>
                     <span class="severity-badge badge-medium">中危</span>
@@ -419,8 +888,12 @@
                     <p><strong>描述:</strong> {{ vuln.description }}</p>
                     
                     {% if vuln.snippet %}
+                                        <div class="code-header">
+                                            <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
+                                        </div>
                     <div class="code-section">
-                        <pre>{{ vuln.snippet }}</pre>
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -428,7 +901,7 @@
                 {% for remediation in remediations %}
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
-                        <h4>修复建议</h4>
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
                         <div class="remediation-section">
                             {{ remediation.specific_remediation|safe }}
                         </div>
@@ -437,12 +910,15 @@
                 {% endfor %}
             </div>
             {% endfor %}
+                            </div>
             {% endif %}
             
+                            <!-- 低危漏洞 -->
             {% if vulnerabilities_by_severity.low|length > 0 %}
-            <h3>低危漏洞 ({{ vulnerabilities_by_severity.low|length }})</h3>
+                            <div class="severity-section" data-severity="low">
+                                <h3><i class="fas fa-info-circle"></i> 低危漏洞 <span class="count-badge">{{ vulnerabilities_by_severity.low|length }}</span></h3>
             {% for vuln in vulnerabilities_by_severity.low %}
-            <div class="vuln-card">
+                                <div class="vuln-card" data-severity="low" data-type="{{ vuln.vulnerability_type }}">
                 <div class="card-header">
                     <span>{{ vuln.vulnerability_type }}</span>
                     <span class="severity-badge badge-low">低危</span>
@@ -454,8 +930,12 @@
                     <p><strong>描述:</strong> {{ vuln.description }}</p>
                     
                     {% if vuln.snippet %}
+                                        <div class="code-header">
+                                            <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
+                                        </div>
                     <div class="code-section">
-                        <pre>{{ vuln.snippet }}</pre>
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -463,7 +943,7 @@
                 {% for remediation in remediations %}
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
-                        <h4>修复建议</h4>
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
                         <div class="remediation-section">
                             {{ remediation.specific_remediation|safe }}
                         </div>
@@ -472,12 +952,15 @@
                 {% endfor %}
             </div>
             {% endfor %}
+                            </div>
             {% endif %}
             
+                            <!-- 信息提醒 -->
             {% if vulnerabilities_by_severity.info|length > 0 %}
-            <h3>信息提醒 ({{ vulnerabilities_by_severity.info|length }})</h3>
+                            <div class="severity-section" data-severity="info">
+                                <h3><i class="fas fa-info"></i> 信息提醒 <span class="count-badge">{{ vulnerabilities_by_severity.info|length }}</span></h3>
             {% for vuln in vulnerabilities_by_severity.info %}
-            <div class="vuln-card">
+                                <div class="vuln-card" data-severity="info" data-type="{{ vuln.vulnerability_type }}">
                 <div class="card-header">
                     <span>{{ vuln.vulnerability_type }}</span>
                     <span class="severity-badge badge-info">信息</span>
@@ -489,8 +972,12 @@
                     <p><strong>描述:</strong> {{ vuln.description }}</p>
                     
                     {% if vuln.snippet %}
+                                        <div class="code-header">
+                                            <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
+                                        </div>
                     <div class="code-section">
-                        <pre>{{ vuln.snippet }}</pre>
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -498,7 +985,7 @@
                 {% for remediation in remediations %}
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
-                        <h4>修复建议</h4>
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
                         <div class="remediation-section">
                             {{ remediation.specific_remediation|safe }}
                         </div>
@@ -507,36 +994,540 @@
                 {% endfor %}
             </div>
             {% endfor %}
+                            </div>
             {% endif %}
+                        </div>
+                    </div>
         </section>
         
-        <section id="security-recommendations">
-            <h2>安全建议</h2>
-            <div class="vuln-card">
+                <!-- 依赖关系部分 -->
+                {% if dependency_data %}
+                <section id="dependency" class="card">
                 <div class="card-header">
-                    <span>整体安全建议</span>
+                        <h2><i class="fas fa-project-diagram"></i> 代码依赖关系</h2>
                 </div>
                 <div class="card-body">
-                    <h4>安全最佳实践</h4>
-                    <ul>
-                        <li><strong>输入验证</strong>: 验证所有来自外部来源的数据，确保它们符合预期格式和长度。</li>
-                        <li><strong>输出编码</strong>: 对所有输出到用户界面的数据进行适当的编码，防止XSS攻击。</li>
-                        <li><strong>参数化查询</strong>: 使用参数化查询和预处理语句，防止SQL注入攻击。</li>
-                        <li><strong>身份验证和授权</strong>: 实施强大的身份验证机制，并确保适当的授权检查。</li>
-                        <li><strong>安全密码存储</strong>: 使用强哈希算法(如bcrypt)存储密码，并使用盐值。</li>
-                        <li><strong>敏感数据保护</strong>: 对敏感数据进行加密存储和传输。</li>
-                        <li><strong>安全配置</strong>: 确保应用程序和服务器配置遵循安全最佳实践。</li>
-                        <li><strong>错误处理</strong>: 实现安全的错误处理，避免泄露敏感信息。</li>
-                        <li><strong>日志记录和监控</strong>: 记录安全相关事件并定期审查日志。</li>
-                        <li><strong>依赖管理</strong>: 定期更新和审计第三方依赖，修复已知漏洞。</li>
-                    </ul>
+                        <div id="dependency-chart" style="width: 100%; height: 500px;"></div>
+                        <p class="chart-note">
+                            <i class="fas fa-info-circle"></i> 此图显示了项目中各组件之间的依赖关系，可用于理解代码结构和识别潜在安全风险点。
+                        </p>
                 </div>
+                </section>
+                {% endif %}
+                
+                <!-- 安全建议部分 -->
+                <section id="recommendations" class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-lightbulb"></i> 安全建议</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>安全最佳实践</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="recommendations-grid">
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-filter"></i></div>
+                                        <h4>输入验证</h4>
+                                        <p>验证所有来自外部来源的数据，确保它们符合预期格式和长度，防止注入类攻击。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-code"></i></div>
+                                        <h4>输出编码</h4>
+                                        <p>对所有输出到用户界面的数据进行适当的编码，防止XSS等攻击。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-database"></i></div>
+                                        <h4>参数化查询</h4>
+                                        <p>使用参数化查询和预处理语句，防止SQL注入攻击。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-user-shield"></i></div>
+                                        <h4>身份验证和授权</h4>
+                                        <p>实施强大的身份验证机制，并确保适当的授权检查。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-key"></i></div>
+                                        <h4>安全密码存储</h4>
+                                        <p>使用强哈希算法(如bcrypt)存储密码，并使用盐值增加安全性。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-lock"></i></div>
+                                        <h4>敏感数据保护</h4>
+                                        <p>对敏感数据进行加密存储和传输，使用适当的加密算法和密钥管理。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-cogs"></i></div>
+                                        <h4>安全配置</h4>
+                                        <p>确保应用程序和服务器配置遵循安全最佳实践，移除默认账户和不必要服务。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-exclamation-circle"></i></div>
+                                        <h4>错误处理</h4>
+                                        <p>实现安全的错误处理，避免泄露敏感信息，记录错误但对用户显示通用信息。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-clipboard-list"></i></div>
+                                        <h4>日志记录和监控</h4>
+                                        <p>记录安全相关事件并定期审查日志，实施监控以便及时发现异常活动。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-boxes"></i></div>
+                                        <h4>依赖管理</h4>
+                                        <p>定期更新和审计第三方依赖，修复已知漏洞，使用软件成分分析工具。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 项目特定建议 -->
+                        {% if remediations|length > 0 %}
+                        <div class="card" style="margin-top: 20px;">
+                            <div class="card-header">
+                                <h3>项目特定建议</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="timeline">
+                                    {% for remediation in remediations %}
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4>{{ remediation.title }}</h4>
+                                            <p>{{ remediation.description }}</p>
+                                            {% if remediation.code_example %}
+                                            <div class="code-header">
+                                                <span>修复示例</span>
+                                                <button class="code-copy" data-clipboard-target="#remediation-{{ loop.index }}"><i class="fas fa-copy"></i></button>
+                                            </div>
+                                            <div class="code-section">
+                                                <pre id="remediation-{{ loop.index }}">{{ remediation.code_example }}</pre>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
             </div>
         </section>
+                
+                <!-- 统计数据部分 -->
+                <section id="statistics" class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-chart-pie"></i> 统计数据</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="charts-section">
+                            <div class="chart-container">
+                                <h3>漏洞严重程度分布</h3>
+                                <canvas id="severity-dist-chart"></canvas>
+                            </div>
+                            
+                            <div class="chart-container">
+                                <h3>最常见漏洞类型</h3>
+                                <canvas id="vulnerability-types-chart"></canvas>
+                            </div>
+                            
+                            <div class="chart-container">
+                                <h3>文件复杂度分布</h3>
+                                <canvas id="complexity-chart"></canvas>
+                            </div>
+                            
+                            <div class="chart-container">
+                                <h3>每日发现漏洞数量</h3>
+                                <canvas id="daily-vulns-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
         
         <footer>
-            <p>由 AuditLuma 安全审计系统生成 | {{ scan_date }}</p>
+            <p>由 <strong>AuditLuma</strong> 安全审计系统生成 | {{ scan_date }}</p>
+            <p><small>版本 1.0.0 | <a href="https://github.com/yourusername/auditluma" target="_blank">GitHub</a></small></p>
         </footer>
     </div>
+    
+    <!-- 脚本 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.3.2/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化剪贴板
+            new ClipboardJS('.code-copy').on('success', function(e) {
+                const button = e.trigger;
+                const icon = button.querySelector('i');
+                
+                icon.classList.remove('fa-copy');
+                icon.classList.add('fa-check');
+                
+                setTimeout(() => {
+                    icon.classList.remove('fa-check');
+                    icon.classList.add('fa-copy');
+                }, 2000);
+            });
+            
+            // 导航菜单激活状态
+            const navLinks = document.querySelectorAll('.nav-menu a');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            // 添加点击事件到漏洞卡片标题
+            document.querySelectorAll('.vuln-card .card-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const card = this.closest('.vuln-card');
+                    card.classList.toggle('expanded');
+                });
+            });
+            
+            // 默认展开所有卡片
+            document.querySelectorAll('.vuln-card').forEach(card => {
+                card.classList.add('expanded');
+            });
+            
+            // 添加漏洞类型过滤器
+            const vulnTypes = new Set();
+            document.querySelectorAll('.vuln-card').forEach(card => {
+                vulnTypes.add(card.getAttribute('data-type'));
+            });
+            
+            const vulnTypeFilters = document.getElementById('vulnTypeFilters');
+            Array.from(vulnTypes).sort().forEach((type, index) => {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `filter-type-${index}`;
+                checkbox.className = 'filter-checkbox';
+                checkbox.checked = true;
+                checkbox.setAttribute('data-type', type);
+                
+                const label = document.createElement('label');
+                label.htmlFor = `filter-type-${index}`;
+                label.className = 'filter-label';
+                label.textContent = type;
+                
+                vulnTypeFilters.appendChild(checkbox);
+                vulnTypeFilters.appendChild(label);
+            });
+            
+            // 过滤功能
+            const filterVulnerabilities = () => {
+                const severityFilters = Array.from(document.querySelectorAll('.filter-checkbox[data-severity]:checked')).map(el => el.getAttribute('data-severity'));
+                const typeFilters = Array.from(document.querySelectorAll('.filter-checkbox[data-type]:checked')).map(el => el.getAttribute('data-type'));
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+                
+                document.querySelectorAll('.vuln-card').forEach(card => {
+                    const severity = card.getAttribute('data-severity');
+                    const type = card.getAttribute('data-type');
+                    const text = card.textContent.toLowerCase();
+                    
+                    const severityMatch = severityFilters.includes(severity);
+                    const typeMatch = typeFilters.includes(type);
+                    const searchMatch = searchTerm === '' || text.includes(searchTerm);
+                    
+                    card.style.display = (severityMatch && typeMatch && searchMatch) ? 'block' : 'none';
+                });
+                
+                // 更新各严重程度部分可见性
+                document.querySelectorAll('.severity-section').forEach(section => {
+                    const sectionSeverity = section.getAttribute('data-severity');
+                    const hasVisibleCards = Array.from(section.querySelectorAll('.vuln-card')).some(card => card.style.display !== 'none');
+                    section.style.display = hasVisibleCards ? 'block' : 'none';
+                });
+            };
+            
+            // 添加过滤器事件监听
+            document.querySelectorAll('.filter-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', filterVulnerabilities);
+            });
+            
+            document.getElementById('searchInput').addEventListener('input', filterVulnerabilities);
+            
+            // 展开/折叠按钮
+            document.getElementById('expandAll').addEventListener('click', function() {
+                document.querySelectorAll('.vuln-card').forEach(card => {
+                    card.classList.add('expanded');
+                });
+            });
+            
+            document.getElementById('collapseAll').addEventListener('click', function() {
+                document.querySelectorAll('.vuln-card').forEach(card => {
+                    card.classList.remove('expanded');
+                });
+            });
+            
+            // 漏洞类型分布图
+            const vulnerabilityCtx = document.getElementById('vulnerability-chart').getContext('2d');
+            const vulnTypeLabels = {{ vuln_types|safe }};
+            const vulnTypeCounts = {{ vuln_type_counts|safe }};
+            
+            new Chart(vulnerabilityCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: vulnTypeLabels,
+                    datasets: [{
+                        data: vulnTypeCounts,
+                        backgroundColor: [
+                            '#00c0f5', // 网安蓝
+                            '#60b5f0', // 浅蓝
+                            '#50a6e6', // 蓝色
+                            '#7ad84e', // 绿色
+                            '#ffbd59', // 黄色
+                            '#ff9e58', // 橙色
+                            '#ff6b6b', // 网安红
+                            '#d456ff', // 紫色
+                            '#59c0ff', // 湖蓝
+                            '#c5c3c6'  // 浅灰
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                padding: 20,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: '漏洞类型分布',
+                            font: {
+                                size: 16
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 漏洞严重程度分布图
+            const severityCtx = document.getElementById('severity-dist-chart').getContext('2d');
+            const severityCounts = [
+                {{ stats.high_count }}, 
+                {{ stats.medium_count }}, 
+                {{ stats.low_count }}
+            ];
+            
+            new Chart(severityCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['高危', '中危', '低危'],
+                    datasets: [{
+                        data: severityCounts,
+                        backgroundColor: ['#ff6b6b', '#ffbd59', '#7ad84e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // 最常见漏洞类型图
+            const vulnTypesCtx = document.getElementById('vulnerability-types-chart').getContext('2d');
+            const commonVulnLabels = {{ common_vuln_types|safe }};
+            const commonVulnCounts = {{ common_vuln_counts|safe }};
+            
+            new Chart(vulnTypesCtx, {
+                type: 'bar',
+                data: {
+                    labels: commonVulnLabels,
+                    datasets: [{
+                        label: '漏洞数量',
+                        data: commonVulnCounts,
+                        backgroundColor: '#00c0f5',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: {
+                                display: true,
+                                drawBorder: false
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 文件复杂度分布图
+            const complexityCtx = document.getElementById('complexity-chart').getContext('2d');
+            const complexityLabels = {{ complexity_labels|safe }};
+            const complexityCounts = {{ complexity_counts|safe }};
+            
+            new Chart(complexityCtx, {
+                type: 'bar',
+                data: {
+                    labels: complexityLabels,
+                    datasets: [{
+                        label: '文件数量',
+                        data: complexityCounts,
+                        backgroundColor: '#00c0f5',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                display: true,
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 每日发现漏洞数量
+            const dailyVulnsCtx = document.getElementById('daily-vulns-chart').getContext('2d');
+            const dailyLabels = {{ daily_labels|safe }};
+            
+            // 准备每日漏洞数据
+            const highData = [];
+            const mediumData = [];
+            const lowData = [];
+            
+            {% for day in daily_data %}
+                highData.push({{ day.high }});
+                mediumData.push({{ day.medium }});
+                lowData.push({{ day.low }});
+            {% endfor %}
+            
+            new Chart(dailyVulnsCtx, {
+                type: 'line',
+                data: {
+                    labels: dailyLabels,
+                    datasets: [
+                        {
+                            label: '高危',
+                            data: highData,
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '中危',
+                            data: mediumData,
+                            borderColor: '#ffbd59',
+                            backgroundColor: 'rgba(255, 189, 89, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '低危',
+                            data: lowData,
+                            borderColor: '#7ad84e',
+                            backgroundColor: 'rgba(122, 216, 78, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            stacked: false
+                        }
+                    }
+                }
+            });
+
+            // 依赖关系图
+            {% if dependency_data %}
+            const dependencyChart = echarts.init(document.getElementById('dependency-chart'));
+            const dependencyOption = {{ dependency_data|safe }};
+            dependencyChart.setOption(dependencyOption);
+            
+            window.addEventListener('resize', function() {
+                dependencyChart.resize();
+            });
+            {% endif %}
+
+            // 平滑滚动
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        window.scrollTo({
+                            top: target.offsetTop - 20,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

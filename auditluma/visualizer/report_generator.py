@@ -307,12 +307,12 @@ class ReportGenerator:
             return ""
     
     def _generate_html_report(self, 
-                           vulnerabilities: List[VulnerabilityResult],
-                           vulns_by_severity: Dict[str, List[VulnerabilityResult]],
-                           dependency_graph: Any,
-                           remediation_data: Optional[Dict[str, Any]],
-                           scan_info: Dict[str, Any],
-                           charts_data: Dict[str, Any]) -> str:
+                      vulnerabilities: List[VulnerabilityResult],
+                      vulns_by_severity: Dict[str, List[VulnerabilityResult]],
+                      dependency_graph: Any,
+                      remediation_data: Optional[Dict[str, Any]],
+                      scan_info: Dict[str, Any],
+                      charts_data: Dict[str, Any]) -> str:
         """生成HTML格式的报告"""
         try:
             # 加载HTML模板
@@ -332,7 +332,8 @@ class ReportGenerator:
                 "high_count": len(vulns_by_severity.get("high", [])),
                 "medium_count": len(vulns_by_severity.get("medium", [])),
                 "low_count": len(vulns_by_severity.get("low", [])),
-                "file_count": scan_info.get("scanned_files", 0)
+                "file_count": scan_info.get("scanned_files", 0),
+                "total_count": len(vulnerabilities)
             }
             
             # 准备漏洞类型数据
@@ -365,6 +366,22 @@ class ReportGenerator:
                 "description": f"发现 {len(vulnerabilities)} 个安全问题"
             })
             
+            # 准备每日漏洞趋势数据 (这里使用模拟数据，实际中可以从历史记录获取)
+            today = datetime.datetime.now()
+            daily_data = []
+            
+            # 创建过去7天的日期标签
+            for i in range(6, -1, -1):
+                day = today - datetime.timedelta(days=i)
+                daily_data.append({
+                    "date": day.strftime("%Y-%m-%d"),
+                    "label": "今天" if i == 0 else f"{i}天前",
+                    # 模拟数据
+                    "high": 0 if i != 0 else stats["high_count"],
+                    "medium": 0 if i != 0 else stats["medium_count"],
+                    "low": 0 if i != 0 else stats["low_count"]
+                })
+            
             # 准备报告数据
             report_data = {
                 "project_name": scan_info.get("project_name", "未知项目"),
@@ -382,7 +399,9 @@ class ReportGenerator:
                 "complexity_counts": json.dumps(complexity_counts),
                 "common_vuln_types": json.dumps(common_vuln_types),
                 "common_vuln_counts": json.dumps(common_vuln_counts),
-                "timeline_events": timeline_events
+                "timeline_events": timeline_events,
+                "daily_data": daily_data,
+                "daily_labels": json.dumps([day["label"] for day in daily_data])
             }
             
             # 渲染HTML

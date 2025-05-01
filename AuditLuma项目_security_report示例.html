@@ -1,0 +1,5355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuditLuma安全审计报告 - AuditLuma项目</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            /* 主色调 */
+            --primary-color: #00c0f5;
+            --primary-dark: #0078d7;
+            --primary-light: #b6e3ff;
+            
+            /* 辅助色 */
+            --secondary-color: #586f7c;
+            --background-color: #f8fbff;
+            --card-bg: #ffffff;
+            
+            /* 危险等级颜色 */
+            --critical-color: #ff3a3a;
+            --high-color: #ff6b6b;
+            --medium-color: #ffbd59;
+            --low-color: #7ad84e;
+            --info-color: #00c0f5;
+            
+            /* 文字颜色 */
+            --text-primary: #2b3a4d;
+            --text-secondary: #586f7c;
+            --text-light: #f8f9fa;
+            
+            /* 其他 */
+            --border-color: #e5e9ef;
+            --shadow: 0 2px 8px rgba(0,120,215,0.08);
+            --hover-shadow: 0 4px 12px rgba(0,120,215,0.15);
+            --card-radius: 8px;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0;
+            background-color: transparent;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 30px;
+            border-radius: 0 0 var(--card-radius) var(--card-radius);
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+        
+        .dashboard {
+            display: flex;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .sidebar {
+            width: 280px;
+            position: sticky;
+            top: 20px;
+            align-self: flex-start;
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-right: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .main-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: var(--hover-shadow);
+        }
+        
+        .card-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        h1, h2, h3, h4 {
+            color: var(--primary-dark);
+            font-weight: 600;
+        }
+        
+        h1 {
+            font-size: 2em;
+            margin: 0;
+            color: white;
+        }
+        
+        h2 {
+            font-size: 1.5em;
+            margin-top: 0;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        h3 {
+            font-size: 1.2em;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            padding: 20px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+        
+        .stat-card .icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+        
+        .stat-card .count {
+            font-size: 2em;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card .label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+        
+        .severity-critical .count { color: var(--critical-color); }
+        .severity-high .count { color: var(--high-color); }
+        .severity-medium .count { color: var(--medium-color); }
+        .severity-low .count { color: var(--low-color); }
+        .severity-info .count { color: var(--info-color); }
+        
+        .severity-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.8em;
+            text-transform: uppercase;
+        }
+        
+        .badge-critical { background-color: var(--critical-color); }
+        .badge-high { background-color: var(--high-color); }
+        .badge-medium { background-color: var(--medium-color); color: #333; }
+        .badge-low { background-color: var(--low-color); }
+        .badge-info { background-color: var(--info-color); }
+        
+        /* 导航菜单 */
+        .nav-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+        }
+        
+        .nav-menu li {
+            margin-bottom: 5px;
+        }
+        
+        .nav-menu a {
+            display: block;
+            padding: 10px 15px;
+            color: var(--text-primary);
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .nav-menu a:hover,
+        .nav-menu a.active {
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+        }
+        
+        .nav-menu a i {
+            margin-right: 8px;
+            width: 20px;
+            text-align: center;
+        }
+        
+        /* 过滤器 */
+        .filters {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        
+        .filter-group {
+            margin-bottom: 15px;
+        }
+        
+        .filter-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        .filter-group h4 {
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .filter-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .filter-checkbox {
+            display: none;
+        }
+        
+        .filter-label {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background-color: #f0f0f0;
+            color: var(--text-secondary);
+        }
+        
+        .filter-checkbox:checked + .filter-label {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .filter-label-critical { border: 1px solid var(--critical-color); }
+        .filter-label-high { border: 1px solid var(--high-color); }
+        .filter-label-medium { border: 1px solid var(--medium-color); }
+        .filter-label-low { border: 1px solid var(--low-color); }
+        .filter-label-info { border: 1px solid var(--info-color); }
+        
+        .filter-checkbox:checked + .filter-label-critical { background-color: var(--critical-color); }
+        .filter-checkbox:checked + .filter-label-high { background-color: var(--high-color); }
+        .filter-checkbox:checked + .filter-label-medium { background-color: var(--medium-color); color: #333; }
+        .filter-checkbox:checked + .filter-label-low { background-color: var(--low-color); }
+        .filter-checkbox:checked + .filter-label-info { background-color: var(--info-color); }
+        
+        /* 搜索框 */
+        .search-box {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 10px 15px 10px 35px;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 0.9em;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(58, 123, 213, 0.15);
+        }
+        
+        .search-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--secondary-color);
+        }
+        
+        /* 代码部分 */
+        .code-section {
+            background-color: #292d3e;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            color: #d0d0d0;
+            position: relative;
+        }
+        
+        .code-header {
+            background-color: #1a1c25;
+            padding: 8px 15px;
+            border-radius: 5px 5px 0 0;
+            color: #d0d0d0;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: -5px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .code-path {
+            opacity: 0.7;
+        }
+        
+        .code-copy {
+            background: none;
+            border: none;
+            color: #a0a0a0;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        
+        .code-copy:hover {
+            color: white;
+        }
+        
+        .code-line {
+            display: block;
+            white-space: pre;
+            line-height: 1.5;
+        }
+        
+        .line-number {
+            display: inline-block;
+            width: 30px;
+            margin-right: 10px;
+            text-align: right;
+            color: #606060;
+            user-select: none;
+        }
+        
+        /* 文件路径 */
+        .file-path {
+            font-family: 'Fira Code', monospace;
+            background-color: rgba(0,0,0,0.05);
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            display: inline-block;
+        }
+        
+        /* 图表容器 */
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-container {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            height: 300px;
+        }
+        
+        /* 漏洞卡片 */
+        .vuln-card {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 15px;
+            overflow: hidden;
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .vuln-card .card-body {
+            padding: 20px;
+        }
+        
+        .vuln-card .card-footer {
+            background-color: rgba(0,0,0,0.02);
+            border-top: 1px solid var(--border-color);
+            padding: 15px 20px;
+        }
+        
+        /* 折叠状态 */
+        .vuln-card:not(.expanded) .card-body,
+        .vuln-card:not(.expanded) .card-footer {
+            display: none;
+        }
+        
+        .vuln-card.expanded {
+            box-shadow: var(--hover-shadow);
+        }
+        
+        .vuln-card .card-header {
+            cursor: pointer;
+            position: relative;
+            padding-right: 40px;
+        }
+        
+        .vuln-card .card-header:after {
+            content: '\f107';
+            font-family: 'Font Awesome 5 Free';
+            font-weight: 900;
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.2s ease;
+        }
+        
+        .vuln-card.expanded .card-header:after {
+            transform: translateY(-50%) rotate(180deg);
+        }
+        
+        /* 页脚 */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 50px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+        }
+        
+        footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        /* 推荐建议网格 */
+        .recommendations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .recommendation-item {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .recommendation-item:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+        
+        .recommendation-item .icon {
+            font-size: 2em;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+        
+        .recommendation-item h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: var(--primary-dark);
+        }
+        
+        .recommendation-item p {
+            color: var(--text-secondary);
+            margin: 0;
+            font-size: 0.9em;
+        }
+        
+        /* 时间线 */
+        .timeline {
+            position: relative;
+            margin: 20px 0;
+            padding-left: 20px;
+        }
+        
+        .timeline:before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 2px;
+            background-color: var(--primary-light);
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 30px;
+        }
+        
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            left: -24px;
+            top: 5px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            border: 2px solid var(--primary-light);
+        }
+        
+        .timeline-content {
+            padding-left: 15px;
+        }
+        
+        .timeline-content h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: var(--primary-dark);
+        }
+        
+        .timeline-content p {
+            margin-bottom: 10px;
+        }
+        
+        /* 按钮 */
+        .btn {
+            display: inline-block;
+            padding: 6px 12px;
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+        }
+        
+        .btn:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn i {
+            margin-right: 5px;
+        }
+        
+        /* 计数徽章 */
+        .count-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            font-size: 0.8em;
+            margin-left: 8px;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 992px) {
+            .dashboard {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                position: static;
+                margin-right: 0;
+                margin-bottom: 20px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            }
+            
+            .recommendations-grid {
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 10px;
+            }
+            
+            header {
+                padding: 20px;
+            }
+            
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-card .count {
+                font-size: 1.5em;
+            }
+            
+            .recommendations-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-shield-alt"></i> AuditLuma安全审计报告</h1>
+            <p>项目名称: AuditLuma项目 | 扫描日期: 2025-05-01 10:42:07</p>
+        </header>
+        
+        <div class="dashboard">
+            <!-- 侧边栏导航和过滤器 -->
+            <div class="sidebar">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="搜索漏洞..." />
+                </div>
+                
+                <ul class="nav-menu">
+                    <li><a href="#overview" class="active"><i class="fas fa-home"></i> 概览</a></li>
+                    <li><a href="#vulnerabilities"><i class="fas fa-bug"></i> 漏洞详情</a></li>
+                    <li><a href="#dependency"><i class="fas fa-project-diagram"></i> 依赖关系</a></li>
+                    <li><a href="#recommendations"><i class="fas fa-lightbulb"></i> 安全建议</a></li>
+                    <li><a href="#statistics"><i class="fas fa-chart-pie"></i> 统计数据</a></li>
+                </ul>
+                
+                <div class="filters">
+                    <h3>漏洞过滤器</h3>
+                    
+                    <div class="filter-group">
+                        <h4>严重程度</h4>
+                        <div class="filter-options">
+                            <input type="checkbox" id="filter-critical" class="filter-checkbox" checked data-severity="critical">
+                            <label for="filter-critical" class="filter-label filter-label-critical">严重</label>
+                            
+                            <input type="checkbox" id="filter-high" class="filter-checkbox" checked data-severity="high">
+                            <label for="filter-high" class="filter-label filter-label-high">高危</label>
+                            
+                            <input type="checkbox" id="filter-medium" class="filter-checkbox" checked data-severity="medium">
+                            <label for="filter-medium" class="filter-label filter-label-medium">中危</label>
+                            
+                            <input type="checkbox" id="filter-low" class="filter-checkbox" checked data-severity="low">
+                            <label for="filter-low" class="filter-label filter-label-low">低危</label>
+                            
+                            <input type="checkbox" id="filter-info" class="filter-checkbox" checked data-severity="info">
+                            <label for="filter-info" class="filter-label filter-label-info">信息</label>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <h4>漏洞类型</h4>
+                        <div id="vulnTypeFilters" class="filter-options">
+                            <!-- 将由JavaScript根据实际漏洞类型动态生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 主要内容区 -->
+            <div class="main-content">
+                <!-- 概览部分 -->
+                <section id="overview" class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-home"></i> 项目概览</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="icon"><i class="fas fa-file-code"></i></div>
+                    <div class="count">1</div>
+                                <div class="label">扫描文件数</div>
+                </div>
+                            
+                            <div class="stat-card">
+                                <div class="icon"><i class="fas fa-code"></i></div>
+                    <div class="count">82</div>
+                                <div class="label">扫描代码行数</div>
+                </div>
+                            
+                            <div class="stat-card">
+                                <div class="icon"><i class="fas fa-clock"></i></div>
+                    <div class="count">123.79秒</div>
+                                <div class="label">扫描时长</div>
+                </div>
+                            
+                            <div class="stat-card">
+                                <div class="icon"><i class="fas fa-bug"></i></div>
+                    <div class="count">29</div>
+                                <div class="label">漏洞总数</div>
+                </div>
+            </div>
+            
+                        <div class="stats-grid">
+                            <div class="stat-card severity-critical">
+                                <div class="icon"><i class="fas fa-skull-crossbones"></i></div>
+                                <div class="count">6</div>
+                                <div class="label">严重漏洞</div>
+                </div>
+                            
+                            <div class="stat-card severity-high">
+                                <div class="icon"><i class="fas fa-radiation"></i></div>
+                                <div class="count">13</div>
+                                <div class="label">高危漏洞</div>
+                </div>
+                            
+                            <div class="stat-card severity-medium">
+                                <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                                <div class="count">10</div>
+                                <div class="label">中危漏洞</div>
+                </div>
+                            
+                            <div class="stat-card severity-low">
+                                <div class="icon"><i class="fas fa-info-circle"></i></div>
+                                <div class="count">0</div>
+                                <div class="label">低危漏洞</div>
+                </div>
+                </div>
+        
+                        <!-- 图表区域 -->
+            <div class="charts-section">
+                <div class="chart-container">
+                                <canvas id="severity-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                                <canvas id="vulnerability-chart"></canvas>
+                </div>
+                </div>
+            </div>
+        </section>
+        
+                <!-- 漏洞详情部分 -->
+                <section id="vulnerabilities" class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-bug"></i> 漏洞详情</h2>
+                        <div class="actions">
+                            <button id="expandAll" class="btn"><i class="fas fa-expand-alt"></i> 展开全部</button>
+                            <button id="collapseAll" class="btn"><i class="fas fa-compress-alt"></i> 折叠全部</button>
+            </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="vulnerabilities-container">
+                            <!-- 严重漏洞 -->
+            
+                            <div class="severity-section" data-severity="critical">
+                                <h3><i class="fas fa-skull-crossbones"></i> 严重漏洞 <span class="count-badge">6</span></h3>
+            
+                                <div class="vuln-card" data-severity="critical" data-type="SQL注入">
+                <div class="card-header">
+                    <span>SQL注入</span>
+                    <span class="severity-badge badge-critical">严重</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 4cc8526c-db61-48f5-a89b-2505b15ab1a4</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 0-82</p>
+                    <p><strong>描述:</strong> 代码直接将用户输入(query)拼接到SQL查询中，没有进行任何参数化处理，攻击者可以构造恶意输入来执行任意SQL命令。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:0</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-4cc8526c-db61-48f5-a89b-2505b15ab1a4"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-4cc8526c-db61-48f5-a89b-2505b15ab1a4">query = request.args.get('q', '')
+conn = sqlite3.connect('database.db')
+cursor = conn.cursor()
+sql = "SELECT * FROM users WHERE name LIKE '%" + query + "%'"
+cursor.execute(sql)</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用参数化查询来防止SQL注入。
+
+修复后的代码：
+```python
+query = request.args.get('q', '')
+conn = sqlite3.connect('database.db')
+cursor = conn.cursor()
+# 使用参数化查询，将用户输入作为参数传递
+sql = "SELECT * FROM users WHERE name LIKE ?"
+cursor.execute(sql, ('%' + query + '%',))
+```
+
+修改说明：
+1. 将字符串拼接改为使用问号(?)作为占位符
+2. 使用execute()方法的第二个参数传递查询参数
+3. 将用户输入(query)作为元组参数传递
+
+安全原理：
+1. 参数化查询确保用户输入被正确处理为数据而非SQL代码
+2. 数据库驱动会正确处理特殊字符，防止它们被解释为SQL命令
+3. 这是OWASP推荐的防御SQL注入的首选方法
+
+注意事项：
+1. 即使使用参数化查询，LIKE语句中的通配符(%)仍需小心处理
+2. 建议对用户输入进行额外的长度和格式验证
+3. 考虑使用ORM框架可以进一步降低SQL注入风险
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="critical" data-type="命令注入">
+                <div class="card-header">
+                    <span>命令注入</span>
+                    <span class="severity-badge badge-critical">严重</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> e3f550c8-6408-437a-be2d-f368805b3fa6</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 0-82</p>
+                    <p><strong>描述:</strong> 代码直接将用户输入(cmd)传递给os.popen执行，攻击者可以注入任意系统命令。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:0</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-e3f550c8-6408-437a-be2d-f368805b3fa6"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-e3f550c8-6408-437a-be2d-f368805b3fa6">cmd = request.args.get('cmd', 'echo hello')
+output = os.popen(cmd).read()
+return output</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            这是一个典型的命令注入漏洞，用户输入未经处理直接传递给系统命令执行。以下是修复方案：
+
+修复后的代码：
+```python
+import subprocess
+import shlex
+
+cmd = request.args.get('cmd', 'echo hello')
+# 安全修复：使用白名单验证和参数化执行
+if cmd not in ['echo hello', 'date', 'ls']:  # 只允许预定义的命令
+    return "Invalid command"
+    
+# 使用subprocess.run替代os.popen，并安全处理参数
+args = shlex.split(cmd)
+output = subprocess.run(args, capture_output=True, text=True, shell=False)
+return output.stdout
+```
+
+修复说明：
+1. 使用白名单机制：只允许执行预定义的安全命令列表
+2. 使用subprocess.run替代os.popen：
+   - shell=False 防止shell命令注入
+   - 自动处理输入输出，更安全
+3. 使用shlex.split进行参数分割：
+   - 正确处理带空格的参数
+   - 防止参数注入
+
+安全考虑：
+1. 最小权限原则：只允许必要的命令
+2. 输入验证：白名单是最安全的验证方式
+3. 使用更安全的API：subprocess比os.popen更安全
+4. 禁用shell执行：防止命令串联
+
+最佳实践：
+- 尽可能避免将用户输入作为命令执行
+- 如果必须执行命令，使用白名单严格限制
+- 使用现代subprocess模块而非旧的os.popen
+- 始终设置shell=False
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="critical" data-type="命令注入">
+                <div class="card-header">
+                    <span>命令注入</span>
+                    <span class="severity-badge badge-critical">严重</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 8d5fb9a4-e8cd-4987-9e5b-ad31af943133</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 15-16</p>
+                    <p><strong>描述:</strong> 代码直接执行用户提供的命令参数，攻击者可以执行任意系统命令。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:15</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-8d5fb9a4-e8cd-4987-9e5b-ad31af943133"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-8d5fb9a4-e8cd-4987-9e5b-ad31af943133">cmd = request.args.get('cmd', 'echo hello')
+output = os.popen(cmd).read()</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用白名单限制允许执行的命令，或使用更安全的替代方法如 `subprocess.run()` 并严格限制参数。
+
+修复后的代码示例：
+```python
+import subprocess
+
+# 只允许执行预定义的命令白名单
+ALLOWED_COMMANDS = {'echo', 'ls', 'date'}
+
+cmd = request.args.get('cmd', 'echo hello')
+if cmd.split()[0] not in ALLOWED_COMMANDS:
+    return "Error: Command not allowed"
+
+# 使用subprocess.run()并禁用shell执行
+output = subprocess.run(
+    cmd.split(), 
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+    shell=False  # 关键安全设置
+).stdout
+```
+
+安全原理和考虑：
+1. 命令白名单：严格限制可执行的命令范围
+2. 使用subprocess代替os.popen：更安全的进程控制接口
+3. shell=False：防止命令串联执行
+4. 参数拆分：自动处理参数转义，防止注入
+5. 错误处理：捕获并限制错误输出
+
+最佳实践：
+- 永远不要直接执行用户输入
+- 使用最小权限原则
+- 考虑更安全的替代方案（如直接调用API而非shell命令）
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="critical" data-type="SQL注入">
+                <div class="card-header">
+                    <span>SQL注入</span>
+                    <span class="severity-badge badge-critical">严重</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 8f38896d-3a8a-4e66-a6b9-2b46e4730d1c</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 20-31</p>
+                    <p><strong>描述:</strong> 代码直接将用户输入的查询参数(q)拼接到SQL查询中，没有进行任何过滤或参数化处理。攻击者可以构造恶意输入来修改SQL查询逻辑，可能导致数据泄露、数据篡改或数据库服务器被控制。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:20</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-8f38896d-3a8a-4e66-a6b9-2b46e4730d1c"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-8f38896d-3a8a-4e66-a6b9-2b46e4730d1c">query = request.args.get('q', '')
+sql = "SELECT * FROM users WHERE name LIKE '%" + query + "%'"
+cursor.execute(sql)</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用参数化查询来防止SQL注入，这是最安全可靠的方式。
+
+修复后的代码：
+```python
+query = request.args.get('q', '')
+sql = "SELECT * FROM users WHERE name LIKE %s"  # 使用占位符%s
+cursor.execute(sql, ('%' + query + '%',))  # 参数作为元组传递
+```
+
+修改说明：
+1. 将字符串拼接改为使用参数化查询（使用%s占位符）
+2. 将用户输入作为单独参数传递给execute()方法
+
+安全原理：
+1. 参数化查询确保用户输入始终被当作数据而非SQL代码处理
+2. 数据库驱动会正确处理特殊字符的转义
+3. 查询结构和数据完全分离，从根本上防止注入
+
+最佳实践：
+1. 永远不要直接拼接用户输入到SQL语句
+2. 使用数据库驱动提供的参数化查询接口
+3. 对于LIKE模糊查询，通配符(%)应包含在参数值中而非SQL语句中
+
+注意：即使参数化查询是首选方案，对于用户提供的搜索词仍建议进行适当的输入验证和长度限制。
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="critical" data-type="命令注入">
+                <div class="card-header">
+                    <span>命令注入</span>
+                    <span class="severity-badge badge-critical">严重</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 10ebf60f-fa44-4452-89aa-acfce006a122</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 20-31</p>
+                    <p><strong>描述:</strong> 在execute_command函数中，直接将用户输入(cmd)传递给os.popen执行，可能导致任意命令执行。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:20</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-10ebf60f-fa44-4452-89aa-acfce006a122"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-10ebf60f-fa44-4452-89aa-acfce006a122">cmd = request.args.get('cmd', 'echo hello')
+output = os.popen(cmd).read()
+return output</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            # 命令注入漏洞修复方案
+
+## 问题分析
+该代码直接将用户提供的`cmd`传递给`os.popen()`执行，这允许攻击者注入任意命令（如`; rm -rf /`），导致严重的命令注入漏洞。
+
+## 修复方案
+
+### 方案1：使用白名单限制允许的命令
+```python
+import os
+from flask import request
+
+# 定义允许的命令白名单
+ALLOWED_COMMANDS = {
+    'echo': ['hello', 'world'],
+    'ls': ['-l', '-a']
+}
+
+def execute_command():
+    cmd = request.args.get('cmd', 'echo hello')
+    
+    # 分割命令和参数
+    parts = cmd.split()
+    base_cmd = parts[0]
+    args = parts[1:] if len(parts) > 1 else []
+    
+    # 检查命令是否在白名单中
+    if base_cmd not in ALLOWED_COMMANDS:
+        return "Error: Command not allowed"
+    
+    # 检查参数是否在允许范围内
+    for arg in args:
+        if arg not in ALLOWED_COMMANDS[base_cmd]:
+            return "Error: Argument not allowed"
+    
+    # 安全地执行命令
+    output = os.popen(cmd).read()
+    return output
+```
+
+### 方案2：使用subprocess.run()并转义参数
+```python
+import subprocess
+from flask import request
+import shlex
+
+def execute_command():
+    cmd = request.args.get('cmd', 'echo hello')
+    
+    try:
+        # 分割并转义命令参数
+        args = shlex.split(cmd)
+        
+        # 使用subprocess.run()并禁用shell=True
+        result = subprocess.run(args, 
+                              capture_output=True,
+                              text=True,
+                              shell=False,  # 关键安全设置
+                              check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        return f"Error: {e.stderr}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+```
+
+## 安全考虑
+
+1. **白名单方法**：
+   - 只允许预定义的命令和参数
+   - 提供了最严格的控制
+   - 适合命令范围有限的情况
+
+2. **subprocess方法**：
+   - 使用`shell=False`防止命令注入
+   - `shlex.split()`正确处理参数转义
+   - 捕获并处理所有可能的错误
+
+## 最佳实践建议
+
+1. 优先使用白名单方法，特别是当可接受的命令集有限时
+2. 如果必须接受动态命令，使用`subprocess.run()`而非`os.popen()`
+3. 永远不要将用户输入直接传递给shell
+4. 考虑使用更高级的API替代直接命令执行（如使用Python原生库完成操作）
+
+方案1提供了最高安全性，但灵活性较低；方案2更灵活但仍保持安全。根据具体需求选择合适方案。
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="critical" data-type="命令注入">
+                <div class="card-header">
+                    <span>命令注入</span>
+                    <span class="severity-badge badge-critical">严重</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> f5ab149d-3b4d-4b44-8e7a-fe1c96d00979</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 51-55</p>
+                    <p><strong>描述:</strong> 该函数直接从用户输入(request.args.get('cmd'))获取命令并执行，没有进行任何验证或过滤。攻击者可以注入任意系统命令，导致服务器被完全控制。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:51</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-f5ab149d-3b4d-4b44-8e7a-fe1c96d00979"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-f5ab149d-3b4d-4b44-8e7a-fe1c96d00979">def execute_command():
+    # 命令注入漏洞示例
+    cmd = request.args.get('cmd', 'echo hello')
+    output = os.popen(cmd).read()
+    return output</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用白名单验证和安全的命令执行方式
+
+修复后的代码示例：
+```python
+import subprocess
+import shlex
+
+def execute_command():
+    # 定义允许的命令白名单
+    ALLOWED_COMMANDS = {'echo', 'ls', 'date'}
+    
+    # 获取用户输入并验证
+    cmd = request.args.get('cmd', 'echo hello')
+    base_cmd = cmd.split()[0]  # 获取基本命令
+    
+    if base_cmd not in ALLOWED_COMMANDS:
+        return "Error: Command not allowed"
+    
+    try:
+        # 使用subprocess.run安全执行命令
+        args = shlex.split(cmd)  # 安全分割参数
+        result = subprocess.run(args, 
+                              capture_output=True,
+                              text=True,
+                              check=True,
+                              timeout=5)  # 设置超时
+        return result.stdout
+    except subprocess.TimeoutExpired:
+        return "Error: Command timed out"
+    except Exception as e:
+        return f"Error: {str(e)}"
+```
+
+修复原理和安全考虑：
+1. 命令白名单验证：只允许预定义的命令执行，从根本上防止任意命令注入
+2. 使用subprocess代替os.popen：subprocess更安全且提供更多控制选项
+3. 参数安全分割：使用shlex.split()正确处理带空格的参数
+4. 添加执行限制：
+   - 超时控制(5秒)防止长时间运行
+   - 捕获输出而非直接返回
+   - 错误处理防止信息泄露
+5. 最小权限原则：即使命令执行也应在最低必要权限下运行
+
+最佳实践补充：
+1. 在生产环境中，应考虑使用更严格的沙箱环境
+2. 记录所有命令执行日志用于审计
+3. 如果可能，尽量避免直接执行系统命令，寻找替代方案
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                            </div>
+            
+            
+                            <!-- 高危漏洞 -->
+            
+                            <div class="severity-section" data-severity="high">
+                                <h3><i class="fas fa-radiation"></i> 高危漏洞 <span class="count-badge">13</span></h3>
+            
+                                <div class="vuln-card" data-severity="high" data-type="路径遍历">
+                <div class="card-header">
+                    <span>路径遍历</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 7fbfd881-063b-4766-ba3b-d617fa5222dd</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 0-82</p>
+                    <p><strong>描述:</strong> 代码直接将用户输入(username)拼接到文件路径中，没有进行验证或清理，攻击者可以通过构造特殊路径访问系统任意文件。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:0</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-7fbfd881-063b-4766-ba3b-d617fa5222dd"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-7fbfd881-063b-4766-ba3b-d617fa5222dd">username = request.args.get('username', '')
+file_path = os.path.join('user_files', username)
+if os.path.exists(file_path):
+    with open(file_path, 'r') as f:
+        content = f.read()</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用 `os.path.abspath` 和 `os.path.commonprefix` 来验证路径是否在允许的目录范围内。
+
+修复后的代码：
+
+```python
+import os
+
+BASE_DIR = os.path.abspath('user_files')  # 定义安全的基础目录
+
+username = request.args.get('username', '')
+file_path = os.path.abspath(os.path.join(BASE_DIR, username))
+
+# 验证路径是否在允许的目录下
+if not os.path.commonprefix([file_path, BASE_DIR]) == BASE_DIR:
+    raise ValueError("Invalid file path")
+
+if os.path.exists(file_path):
+    with open(file_path, 'r') as f:
+        content = f.read()
+```
+
+安全修复说明：
+1. 使用 `os.path.abspath` 将路径转换为绝对路径，消除相对路径符号(如../)
+2. 定义 `BASE_DIR` 作为安全的基础路径
+3. 使用 `os.path.commonprefix` 检查最终路径是否在允许的目录下
+4. 如果路径验证失败则抛出异常
+
+安全考虑：
+1. 防止攻击者使用 `../` 等路径遍历符号访问系统文件
+2. 将文件访问限制在特定目录下
+3. 绝对路径检查比简单的字符串检查更可靠
+4. 遵循最小权限原则，只允许访问特定目录
+
+最佳实践：
+1. 永远不要信任用户提供的路径
+2. 使用白名单方式限制可访问的目录
+3. 在访问文件系统前进行严格的路径验证
+4. 考虑使用安全的文件访问库如 `werkzeug.utils.secure_filename`
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="XSS (跨站脚本)">
+                <div class="card-header">
+                    <span>XSS (跨站脚本)</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 5c507259-094d-4365-b8f0-8ec2bf955678</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 0-82</p>
+                    <p><strong>描述:</strong> 代码直接将用户输入(username和content)插入到HTML响应中，没有进行转义，攻击者可以注入恶意脚本。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:0</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-5c507259-094d-4365-b8f0-8ec2bf955678"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-5c507259-094d-4365-b8f0-8ec2bf955678">return f"<h1>用户资料</h1><div>{username}</div><div>{content}</div>"</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用 HTML 转义来防止 XSS 攻击
+
+修复后的代码：
+```python
+from html import escape
+
+return f"<h1>用户资料</h1><div>{escape(username)}</div><div>{escape(content)}</div>"
+```
+
+修改说明：
+1. 导入 Python 标准库的 `html.escape` 函数
+2. 对所有用户提供的输入(username和content)应用 `escape()` 函数
+
+安全原理：
+1. `escape()` 函数会将特殊字符转换为 HTML 实体，例如：
+   - `<` 转换为 `&lt;`
+   - `>` 转换为 `&gt;`
+   - `"` 转换为 `&quot;`
+   - `&` 转换为 `&amp;`
+2. 这样即使输入中包含恶意脚本，也会被转义为无害的文本显示
+
+最佳实践建议：
+1. 对所有动态插入到页面中的用户输入都进行转义
+2. 考虑使用现代模板引擎(如Jinja2)，它们通常默认开启自动转义
+3. 对于需要保留HTML格式的情况，使用白名单过滤而不是完全禁用转义
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="目录遍历">
+                <div class="card-header">
+                    <span>目录遍历</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 558fafc0-3446-4e0a-9290-cfc12e51e8ab</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 0-82</p>
+                    <p><strong>描述:</strong> 代码直接将用户输入(filename)拼接到文件路径中，可能导致任意文件读取。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:0</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-558fafc0-3446-4e0a-9290-cfc12e51e8ab"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-558fafc0-3446-4e0a-9290-cfc12e51e8ab">filename = request.args.get('filename', '')
+path = "files/" + filename
+if not os.path.exists(path):
+    return "File not found: " + path
+with open(path, 'rb') as f:
+    return f.read()</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            # 目录遍历漏洞修复方案
+
+## 问题分析
+当前代码直接将用户提供的`filename`参数拼接到基础路径中，没有进行任何验证或清理，攻击者可以通过`../`等路径遍历字符访问系统上的任意文件。
+
+## 修复方案
+
+```python
+import os
+from werkzeug.utils import secure_filename
+
+filename = request.args.get('filename', '')
+# 验证和清理文件名
+safe_filename = secure_filename(filename)
+if not safe_filename or safe_filename != filename:
+    return "Invalid filename", 400
+
+base_dir = os.path.abspath("files/")
+path = os.path.join(base_dir, safe_filename)
+
+# 防止目录遍历攻击
+if not os.path.abspath(path).startswith(base_dir):
+    return "Access denied", 403
+
+if not os.path.exists(path):
+    return "File not found: " + safe_filename, 404
+
+with open(path, 'rb') as f:
+    return f.read()
+```
+
+## 修复说明
+
+1. **使用`secure_filename`函数**:
+   - 清理文件名，移除特殊字符和路径分隔符
+   - 确保只保留安全的文件名字符
+
+2. **绝对路径检查**:
+   - 使用`os.path.abspath`获取绝对路径
+   - 验证最终路径是否在允许的目录范围内
+
+3. **额外安全措施**:
+   - 文件名验证失败时返回400错误
+   - 路径遍历尝试返回403禁止访问
+   - 文件不存在返回404错误
+
+4. **安全考虑**:
+   - 采用白名单方式验证文件名
+   - 双重验证路径安全性
+   - 遵循最小权限原则
+
+## 最佳实践
+- 考虑将文件ID存储在数据库中而不是直接使用文件名
+- 实现内容分发网络(CDN)来提供静态文件
+- 设置适当的文件系统访问权限
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="SQL注入">
+                <div class="card-header">
+                    <span>SQL注入</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> e4bcf3da-d9fe-4619-8323-8e8ba68d4422</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 15-16</p>
+                    <p><strong>描述:</strong> 代码直接拼接用户输入(query)到SQL查询中，攻击者可以构造恶意输入来操纵SQL查询，可能导致数据泄露、数据篡改或数据库服务器被控制。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:15</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-e4bcf3da-d9fe-4619-8323-8e8ba68d4422"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-e4bcf3da-d9fe-4619-8323-8e8ba68d4422">sql = "SELECT * FROM users WHERE name LIKE '%" + query + "%'"
+cursor.execute(sql)</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用参数化查询来防止SQL注入，这是最安全可靠的方式。
+
+修复后的代码示例：
+```python
+sql = "SELECT * FROM users WHERE name LIKE %s"
+cursor.execute(sql, ('%' + query + '%',))  # 注意参数化查询的占位符和参数格式
+```
+
+修改说明：
+1. 将字符串拼接改为使用`%s`占位符
+2. 将用户输入作为参数单独传递给execute方法
+3. 通配符`%`现在与查询参数一起传递
+
+安全原理：
+1. 参数化查询确保用户输入始终被当作数据而非SQL代码处理
+2. 数据库驱动会自动处理参数转义和类型安全
+3. 完全防止了SQL注入，无论用户输入什么特殊字符
+
+最佳实践：
+1. 永远不要直接拼接用户输入到SQL语句
+2. 使用各语言/框架提供的参数化查询接口
+3. 对于LIKE语句，通配符应作为参数的一部分而非SQL字符串的一部分
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="路径遍历">
+                <div class="card-header">
+                    <span>路径遍历</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 11ba33f2-329c-4b2c-8d46-5e569af4e70c</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 15-16</p>
+                    <p><strong>描述:</strong> 代码直接使用用户提供的username参数构造文件路径，攻击者可以通过输入类似"../../etc/passwd"的路径来访问系统敏感文件。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:15</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-11ba33f2-329c-4b2c-8d46-5e569af4e70c"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-11ba33f2-329c-4b2c-8d46-5e569af4e70c">file_path = os.path.join('user_files', username)</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用 `os.path.abspath` 和 `os.path.normpath` 规范化路径，并验证路径是否在允许的目录下。
+
+修复后的代码示例：
+```python
+import os
+
+BASE_DIR = os.path.abspath('user_files')  # 定义基础安全目录
+
+def get_user_file_path(username):
+    # 规范化路径并确保在基础目录下
+    user_path = os.path.normpath(os.path.join(BASE_DIR, username))
+    if not user_path.startswith(BASE_DIR):
+        raise ValueError("Invalid path attempt")
+    return user_path
+```
+
+安全考虑和修复原理：
+1. `os.path.abspath` 将路径转为绝对路径，消除相对路径符号(../)
+2. `os.path.normpath` 规范化路径格式
+3. 显式验证最终路径是否在允许的基础目录下
+4. 如果路径尝试逃逸基础目录则抛出异常
+
+最佳实践：
+- 永远不要信任用户提供的路径
+- 使用白名单方式限制可访问的目录
+- 在拼接路径前先验证输入的有效性
+- 使用专门的库如 `werkzeug.utils.secure_filename` 处理文件名更安全
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="跨站脚本(XSS)">
+                <div class="card-header">
+                    <span>跨站脚本(XSS)</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 5c3f1171-cf12-4d59-8532-7b733e2ce62e</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 20-31</p>
+                    <p><strong>描述:</strong> 在profile函数中，直接将用户输入(username)和文件内容(content)输出到HTML中，没有进行任何转义处理。攻击者可以注入恶意JavaScript代码，在用户浏览器中执行。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:20</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-5c3f1171-cf12-4d59-8532-7b733e2ce62e"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-5c3f1171-cf12-4d59-8532-7b733e2ce62e">return f"<h1>用户资料</h1><div>{username}</div><div>{content}</div>"</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用HTML转义来防止XSS攻击
+
+修复后的代码：
+```python
+from html import escape
+
+return f"<h1>用户资料</h1><div>{escape(username)}</div><div>{escape(content)}</div>"
+```
+
+修改说明：
+1. 从Python标准库`html`中导入`escape`函数
+2. 对所有用户提供的输入(username和content)应用`escape()`函数进行转义
+
+安全原理：
+1. `escape()`函数会将特殊字符(&, <, >, ", ')转换为HTML实体(&amp;, &lt;, &gt;, &quot;, &#39;)
+2. 这样即使输入中包含恶意脚本，也会被转义为纯文本显示，而不会作为HTML/JS代码执行
+
+最佳实践：
+1. 对所有动态插入到HTML中的用户输入都要进行转义
+2. 遵循"默认转义"原则，除非明确需要HTML内容，否则都应转义
+3. 对于更复杂的场景，可以考虑使用模板引擎(如Jinja2)的自动转义功能
+
+额外建议：
+1. 设置Content-Security-Policy(CSP)头作为额外防护层
+2. 对于富文本内容，使用专门的HTML净化库(如bleach)
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="路径遍历">
+                <div class="card-header">
+                    <span>路径遍历</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> a8c36b23-2003-4e7c-b3cd-e5d314d2a948</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 20-31</p>
+                    <p><strong>描述:</strong> 在profile函数中，直接将用户输入(username)作为文件路径的一部分，可能导致攻击者访问系统上的任意文件。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:20</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-a8c36b23-2003-4e7c-b3cd-e5d314d2a948"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-a8c36b23-2003-4e7c-b3cd-e5d314d2a948">file_path = os.path.join('user_files', username)
+if os.path.exists(file_path):
+    with open(file_path, 'r') as f:</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：需要对用户输入(username)进行严格的验证和规范化处理，防止路径遍历攻击。
+
+修复后的代码示例：
+
+```python
+import os
+from werkzeug.utils import secure_filename
+
+def get_user_file(username):
+    # 验证用户名只包含允许的字符
+    if not username.isalnum():  # 只允许字母数字
+        raise ValueError("Invalid username")
+    
+    # 安全地拼接路径
+    safe_username = secure_filename(username)  # 进一步清理特殊字符
+    file_path = os.path.join('user_files', safe_username)
+    
+    # 验证最终路径是否在允许的目录下
+    base_dir = os.path.abspath('user_files')
+    abs_path = os.path.abspath(file_path)
+    if not abs_path.startswith(base_dir):
+        raise ValueError("Invalid file path")
+    
+    if os.path.exists(abs_path):
+        with open(abs_path, 'r') as f:
+            return f.read()
+    return None
+```
+
+修复原理和安全考虑：
+1. 输入验证：使用`isalnum()`确保用户名只包含字母数字，防止特殊字符注入
+2. 路径清理：使用`secure_filename`进一步清理特殊字符(如../)
+3. 路径规范化：使用`os.path.abspath`获取绝对路径
+4. 目录限制：检查最终路径是否在允许的基目录下
+5. 防御深度：多层防护(输入验证+路径清理+目录限制)
+
+最佳实践：
+- 永远不要信任用户输入
+- 使用白名单而非黑名单进行验证
+- 使用专门的路径处理函数(如secure_filename)
+- 实施多层次的防御措施
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="路径遍历 (Path Traversal)">
+                <div class="card-header">
+                    <span>路径遍历 (Path Traversal)</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 8c0bc62a-7d00-4ef3-bf8e-9a5e152ff94a</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 35-47</p>
+                    <p><strong>描述:</strong> 代码直接将用户提供的username参数用于构建文件路径，没有进行任何验证或清理。攻击者可以通过提供包含../等特殊字符的用户名来访问系统上的任意文件。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:35</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-8c0bc62a-7d00-4ef3-bf8e-9a5e152ff94a"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-8c0bc62a-7d00-4ef3-bf8e-9a5e152ff94a">username = request.args.get('username', '')
+file_path = os.path.join('user_files', username)
+if os.path.exists(file_path):
+    with open(file_path, 'r') as f:
+        content = f.read()</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用 `os.path.abspath` 和 `os.path.commonprefix` 来验证路径是否在允许的目录范围内。
+
+修复后的代码：
+
+```python
+import os
+
+BASE_DIR = os.path.abspath('user_files')  # 定义安全的基础目录
+
+username = request.args.get('username', '')
+# 清理输入并构建完整路径
+file_path = os.path.abspath(os.path.join(BASE_DIR, username))
+
+# 验证路径是否在允许的目录范围内
+if os.path.commonprefix([file_path, BASE_DIR]) == BASE_DIR:
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            content = f.read()
+else:
+    raise ValueError("Invalid file path")
+```
+
+安全原理和修改说明：
+1. 定义了 `BASE_DIR` 作为安全的基础目录，使用 `os.path.abspath` 确保是绝对路径
+2. 使用 `os.path.abspath` 处理用户输入，解析所有相对路径符号(如../)
+3. 使用 `os.path.commonprefix` 检查最终路径是否仍在基础目录下
+4. 如果路径验证失败则抛出异常，而不是继续操作
+
+额外安全建议：
+1. 可以进一步限制用户名只允许字母数字等安全字符
+2. 考虑使用白名单方式验证文件扩展名
+3. 考虑使用专门的文件存储API而不是直接文件系统访问
+
+这种修复方式遵循了最小权限原则，确保用户只能访问指定目录下的文件，有效防止了路径遍历攻击。
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="SQL注入">
+                <div class="card-header">
+                    <span>SQL注入</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> d973aa28-cee7-47b9-a30a-0b582e63c29f</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 51-55</p>
+                    <p><strong>描述:</strong> 直接将用户输入(query)拼接到SQL查询中，攻击者可以注入恶意SQL语句，可能导致数据泄露、篡改或删除。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:51</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-d973aa28-cee7-47b9-a30a-0b582e63c29f"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-d973aa28-cee7-47b9-a30a-0b582e63c29f">sql = "SELECT * FROM users WHERE name LIKE '%" + query + "%'"</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用参数化查询来防止SQL注入
+
+修复后的代码示例（Python使用sqlite3为例）：
+```python
+# 使用参数化查询
+sql = "SELECT * FROM users WHERE name LIKE ?"
+cursor.execute(sql, ('%' + query + '%',))
+```
+
+修改说明：
+1. 将字符串拼接改为使用`?`作为占位符
+2. 将用户输入(query)作为参数单独传递
+
+安全原理：
+1. 参数化查询会将用户输入始终作为数据而非SQL代码处理
+2. 数据库驱动会自动处理特殊字符的转义
+3. 即使query中包含SQL语句也会被当作普通字符串处理
+
+最佳实践：
+1. 永远不要直接拼接用户输入到SQL语句
+2. 使用各语言提供的参数化查询接口
+3. 对于LIKE模糊查询，在参数中添加%通配符而非SQL中
+
+其他语言示例：
+- PHP/PDO: `$stmt = $pdo->prepare("SELECT * FROM users WHERE name LIKE ?");`
+- Java/JDBC: `PreparedStatement stmt = conn.prepareStatement("SELECT * FROM users WHERE name LIKE ?");`
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="路径遍历">
+                <div class="card-header">
+                    <span>路径遍历</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> ebb96cb1-dc4b-474d-b6e5-c949690042fc</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 51-55</p>
+                    <p><strong>描述:</strong> 直接将用户输入(filename)拼接到文件路径中，攻击者可以通过../等特殊字符访问系统任意文件。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:51</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-ebb96cb1-dc4b-474d-b6e5-c949690042fc"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-ebb96cb1-dc4b-474d-b6e5-c949690042fc">path = "files/" + filename</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            # 路径遍历漏洞修复方案
+
+## 问题分析
+原始代码直接将用户输入的`filename`拼接到基础路径中，存在路径遍历风险，攻击者可以通过`../`等特殊字符访问系统任意文件。
+
+## 修复方案
+
+### 修复后的代码
+```python
+import os
+
+# 安全基础路径
+BASE_DIR = "files/"
+
+# 获取安全的文件路径
+def get_safe_path(filename):
+    # 规范化路径，移除多余的路径分隔符
+    full_path = os.path.normpath(os.path.join(BASE_DIR, filename))
+    
+    # 验证路径是否仍在基础目录下
+    if not full_path.startswith(os.path.abspath(BASE_DIR)):
+        raise ValueError("非法路径请求")
+    
+    return full_path
+
+# 使用示例
+path = get_safe_path(filename)
+```
+
+### 修改说明
+1. 使用`os.path.join()`代替字符串拼接，确保路径分隔符正确处理
+2. 使用`os.path.normpath()`规范化路径，移除多余的`.`和`..`
+3. 验证最终路径是否仍在基础目录下
+
+## 安全考虑
+1. **路径规范化**：处理所有路径分隔符和相对路径引用
+2. **路径验证**：确保最终路径不会逃逸出基础目录
+3. **最小权限原则**：应用应运行在有限权限下，减少潜在影响
+
+## 最佳实践
+1. 尽可能使用白名单验证文件名
+2. 考虑使用随机生成的文件名而非用户提供的文件名
+3. 在文件系统操作前始终验证路径安全性
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="弱密码策略">
+                <div class="card-header">
+                    <span>弱密码策略</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 9a657098-4d61-4919-8ef2-d0e47e7e0151</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 58-62</p>
+                    <p><strong>描述:</strong> 该函数使用硬编码密码"admin123"进行身份验证，这是一个非常弱的密码策略。攻击者可以轻易猜测或暴力破解这个密码。此外，该函数没有实现任何密码复杂度检查或加密存储机制。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:58</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-9a657098-4d61-4919-8ef2-d0e47e7e0151"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-9a657098-4d61-4919-8ef2-d0e47e7e0151">def insecure_auth(username, password):
+    # 弱密码检查示例
+    if password == "admin123":
+        return True
+    return False</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            # 弱密码策略修复方案
+
+## 问题分析
+1. 使用硬编码密码，极易被攻击者猜测
+2. 没有密码复杂度要求
+3. 明文比较密码，没有安全存储机制
+
+## 修复建议
+
+```python
+import bcrypt
+import re
+
+def secure_auth(username, password):
+    # 1. 从安全存储(如数据库)获取用户密码哈希
+    # 这里只是示例，实际应从数据库获取
+    stored_hash = get_password_hash_from_db(username)  
+    
+    # 2. 验证密码哈希
+    if stored_hash and bcrypt.checkpw(password.encode('utf-8'), stored_hash):
+        return True
+    
+    return False
+
+def validate_password_complexity(password):
+    # 密码复杂度要求:
+    # - 至少8个字符
+    # - 包含大小写字母
+    # - 包含数字
+    # - 包含特殊字符
+    if len(password) < 8:
+        return False
+    if not re.search(r'[A-Z]', password):
+        return False
+    if not re.search(r'[a-z]', password):
+        return False
+    if not re.search(r'[0-9]', password):
+        return False
+    if not re.search(r'[^A-Za-z0-9]', password):
+        return False
+    return True
+
+def hash_password(password):
+    # 使用bcrypt生成安全密码哈希
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+```
+
+## 安全改进说明
+
+1. **密码存储**:
+   - 使用bcrypt进行密码哈希存储，自动加盐
+   - 不再使用硬编码密码
+
+2. **密码复杂度**:
+   - 强制要求密码长度至少8字符
+   - 要求混合大小写字母、数字和特殊字符
+
+3. **验证过程**:
+   - 比较密码哈希而非明文
+   - 使用时间恒定的比较函数(bcrypt内部实现)
+
+## 使用示例
+
+```python
+# 用户注册时
+password = "SecurePass123!"
+if validate_password_complexity(password):
+    hashed = hash_password(password)
+    store_in_db(username, hashed)  # 存储哈希值而非明文
+
+# 用户登录时
+secure_auth(username, input_password)
+```
+
+## 安全考虑
+
+1. bcrypt是专门为密码存储设计的哈希算法，具有:
+   - 内置盐值
+   - 自适应计算成本
+   - 抗暴力破解
+
+2. 密码复杂度要求防止用户使用弱密码
+
+3. 整个方案遵循OWASP认证安全最佳实践
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="硬编码凭证">
+                <div class="card-header">
+                    <span>硬编码凭证</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 7a6e8656-51a9-4507-bc0a-79f814a18af6</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 58-62</p>
+                    <p><strong>描述:</strong> 代码中硬编码了密码"admin123"，这违反了安全最佳实践。如果代码被泄露，攻击者可以直接获得有效的凭证。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:58</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-7a6e8656-51a9-4507-bc0a-79f814a18af6"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-7a6e8656-51a9-4507-bc0a-79f814a18af6">def insecure_auth(username, password):
+    # 弱密码检查示例
+    if password == "admin123":
+        return True
+    return False</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：移除硬编码凭证，改为从安全配置源获取密码或使用安全的认证方式。
+
+修复后的代码示例：
+```python
+import os
+from getpass import getpass
+
+def secure_auth(username, password):
+    # 从环境变量获取正确密码
+    correct_password = os.getenv('ADMIN_PASSWORD')
+    if not correct_password:
+        raise ValueError("Admin password not configured")
+    
+    # 使用恒定时间比较防止时序攻击
+    from hmac import compare_digest
+    return compare_digest(password.encode(), correct_password.encode())
+
+# 使用示例
+username = input("Username: ")
+password = getpass("Password: ")  # 安全获取密码输入
+if secure_auth(username, password):
+    print("Authentication successful")
+else:
+    print("Authentication failed")
+```
+
+安全改进说明：
+1. 移除了硬编码密码，改为从环境变量获取（标记为修改点1）
+2. 使用`getpass`隐藏密码输入（标记为修改点2）
+3. 添加了恒定时间比较防止时序攻击（标记为修改点3）
+4. 添加了配置检查确保密码已设置
+
+安全考虑：
+1. 凭证应存储在安全配置管理系统或密钥库中
+2. 生产环境应使用专业认证方案如OAuth/OIDC
+3. 密码应通过环境变量或配置文件注入，不在代码中留存
+4. 使用恒定时间比较防止通过响应时间推断密码
+
+最佳实践：
+- 永远不要在代码中存储凭证
+- 使用专业认证库而不是自己实现
+- 定期轮换凭证
+- 最小化凭证权限范围
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="high" data-type="目录遍历 (Path Traversal)">
+                <div class="card-header">
+                    <span>目录遍历 (Path Traversal)</span>
+                    <span class="severity-badge badge-high">高危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> be36cd29-79d3-4670-bd68-d01701f9c639</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 66-77</p>
+                    <p><strong>描述:</strong> 代码直接将用户提供的filename参数拼接到文件路径中，没有进行任何验证或清理。攻击者可以通过构造特殊的文件名(如"../../etc/passwd")访问系统上的任意文件。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:66</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-be36cd29-79d3-4670-bd68-d01701f9c639"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-be36cd29-79d3-4670-bd68-d01701f9c639">filename = request.args.get('filename', '')
+path = "files/" + filename</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用 `os.path.join()` 和 `os.path.abspath()` 来安全构建路径，并验证路径是否在允许的目录范围内。
+
+修复后的代码示例：
+```python
+import os
+
+filename = request.args.get('filename', '')
+base_dir = os.path.abspath("files/")  # 获取绝对路径
+requested_path = os.path.join(base_dir, filename)  # 安全拼接路径
+requested_path = os.path.abspath(requested_path)  # 规范化路径
+
+# 验证路径是否在允许的目录下
+if not requested_path.startswith(base_dir):
+    raise ValueError("Invalid file path")
+```
+
+安全原理和考虑：
+1. `os.path.join()` 可以安全地拼接路径，避免手动拼接导致的路径问题
+2. `os.path.abspath()` 规范化路径，解析所有相对路径引用(如../)
+3. 路径验证确保最终路径不会超出允许的目录范围
+4. 这是白名单验证方法，只允许访问指定目录下的文件
+
+最佳实践补充：
+1. 还可以添加文件名白名单验证，只允许特定格式/字符的文件名
+2. 在生产环境中，建议记录所有路径访问尝试以便审计
+3. 考虑使用专门的文件访问库如 `werkzeug.utils.secure_filename()`
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                            </div>
+            
+            
+                            <!-- 中危漏洞 -->
+            
+                            <div class="severity-section" data-severity="medium">
+                                <h3><i class="fas fa-exclamation-triangle"></i> 中危漏洞 <span class="count-badge">10</span></h3>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="弱密码检查">
+                <div class="card-header">
+                    <span>弱密码检查</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 0d770ea3-882c-4526-80fc-d09a9e52d49d</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 0-82</p>
+                    <p><strong>描述:</strong> 密码检查使用硬编码的弱密码("admin123")，且没有其他安全措施如哈希或加盐。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:0</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-0d770ea3-882c-4526-80fc-d09a9e52d49d"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-0d770ea3-882c-4526-80fc-d09a9e52d49d">if password == "admin123":
+    return True
+return False</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用安全的密码哈希存储和验证机制
+
+修复后的代码示例：
+```python
+import bcrypt
+
+# 存储密码时(注册时)
+def store_password(password):
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    # 将hashed存储在数据库中
+    
+# 验证密码时(登录时)
+def verify_password(input_password, stored_hash):
+    return bcrypt.checkpw(input_password.encode('utf-8'), stored_hash)
+```
+
+修改说明：
+1. 移除了硬编码密码
+2. 使用bcrypt进行密码处理
+
+安全原理和考虑：
+1. bcrypt自动处理加盐，每个密码都有唯一盐值
+2. 使用自适应哈希算法，可以调整计算成本来对抗暴力破解
+3. 即使数据库泄露，攻击者也无法直接获取原始密码
+4. 内置防止时序攻击的安全比较
+
+最佳实践：
+1. 永远不要存储明文密码
+2. 使用专门设计的密码哈希算法(如bcrypt, PBKDF2, Argon2)
+3. 要求用户使用强密码(长度+复杂度)
+4. 考虑实施密码过期和重试限制策略
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="敏感信息泄露">
+                <div class="card-header">
+                    <span>敏感信息泄露</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 08f22286-61c6-442b-86e9-a637637727ef</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 0-82</p>
+                    <p><strong>描述:</strong> 当文件不存在时，返回完整的文件路径，可能泄露系统目录结构信息。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:0</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-08f22286-61c6-442b-86e9-a637637727ef"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-08f22286-61c6-442b-86e9-a637637727ef">return "File not found: " + path</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：限制返回的错误信息，避免泄露系统路径信息。
+
+修复后的代码示例：
+```python
+return "File not found"  # 移除了路径信息
+```
+
+或者更安全的版本：
+```python
+raise FileNotFoundError("File not found")  # 使用标准异常而不暴露路径
+```
+
+安全考虑和修复说明：
+1. 移除路径信息可以防止攻击者通过错误信息获取系统目录结构
+2. 使用标准异常而不是自定义错误信息是更安全的做法
+3. 如果需要调试，可以在开发环境中保留详细错误，但在生产环境中应禁用
+
+最佳实践：
+1. 遵循"最小信息泄露"原则
+2. 生产环境应使用通用错误信息
+3. 详细的错误信息应记录到安全日志中，而不是返回给客户端
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="不安全配置">
+                <div class="card-header">
+                    <span>不安全配置</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 910c7bf5-5c9f-4279-b1a5-a527c81de6bd</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 0-82</p>
+                    <p><strong>描述:</strong> 在生产环境中启用调试模式(debug=True)会暴露敏感信息如堆栈跟踪。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:0</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-910c7bf5-5c9f-4279-b1a5-a527c81de6bd"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-910c7bf5-5c9f-4279-b1a5-a527c81de6bd">app.run(debug=True)</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：
+
+在生产环境中必须禁用调试模式，只应在开发环境中使用。
+
+修复后的代码示例：
+```python
+app.run(debug=False)  # 确保生产环境debug=False
+# 或者更好的做法：
+app.run(debug=os.environ.get('FLASK_ENV') == 'development')  # 根据环境变量控制
+```
+
+安全考虑和原理：
+1. 调试模式会暴露敏感信息：当debug=True时，Flask会显示详细的错误堆栈信息，可能包含内部实现细节
+2. 调试模式启用调试器：允许在浏览器中执行任意Python代码
+3. 最佳实践是使用环境变量区分开发和生产环境
+4. 永远不要在生产环境开启调试模式
+
+更安全的配置建议：
+```python
+# 使用配置类或环境变量管理
+class Config:
+    DEBUG = False
+    # 其他配置...
+
+app.config.from_object(Config)
+```
+
+这样可以根据不同环境(开发/测试/生产)灵活控制调试模式，同时保持配置集中管理。
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="XSS (跨站脚本)">
+                <div class="card-header">
+                    <span>XSS (跨站脚本)</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> f89e101f-bbc2-4b2a-bb8a-e6c201a001ec</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 15-16</p>
+                    <p><strong>描述:</strong> 代码直接将用户提供的username和文件内容插入到HTML响应中，没有进行任何转义处理，攻击者可以注入恶意脚本。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:15</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-f89e101f-bbc2-4b2a-bb8a-e6c201a001ec"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-f89e101f-bbc2-4b2a-bb8a-e6c201a001ec">return f"<h1>用户资料</h1><div>{username}</div><div>{content}</div>"</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用HTML转义来防止XSS攻击
+
+修复后的代码：
+```python
+from html import escape
+
+return f"<h1>用户资料</h1><div>{escape(username)}</div><div>{escape(content)}</div>"
+```
+
+修改说明：
+1. 导入Python标准库的`html.escape`函数
+2. 对所有用户提供的变量(username和content)应用escape函数
+
+安全原理：
+1. `escape()`函数会将特殊字符转换为HTML实体，例如：
+   - `<` 转换为 `&lt;`
+   - `>` 转换为 `&gt;`
+   - `"` 转换为 `&quot;`
+   - `&` 转换为 `&amp;`
+2. 这样即使输入包含恶意脚本，也会被转义为无害文本显示
+
+最佳实践：
+1. 对所有动态插入到HTML中的用户输入进行转义
+2. 遵循"默认转义"原则，除非明确需要HTML内容
+3. 对于富文本内容，应使用专门的HTML净化库(如bleach)而不是简单转义
+
+注意：如果content需要保留HTML格式，应该使用专门的HTML净化库而不是简单转义。
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="不安全的直接对象引用">
+                <div class="card-header">
+                    <span>不安全的直接对象引用</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 47ab525e-5996-4b47-9251-1fc8ec3b9763</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 15-16</p>
+                    <p><strong>描述:</strong> 代码直接使用用户提供的username参数访问文件系统，没有进行适当的授权检查。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:15</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-47ab525e-5996-4b47-9251-1fc8ec3b9763"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-47ab525e-5996-4b47-9251-1fc8ec3b9763">file_path = os.path.join('user_files', username)</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            # 不安全的直接对象引用修复方案
+
+## 问题分析
+当前代码直接将用户提供的`username`拼接为文件路径，存在以下风险：
+1. 路径遍历攻击：恶意用户可能使用`../`等特殊字符访问系统其他文件
+2. 未授权访问：任何用户都可以访问其他用户的文件
+
+## 修复方案
+
+```python
+import os
+from werkzeug.utils import secure_filename
+
+def get_user_file_path(username):
+    # 验证用户名格式
+    if not username.isalnum():  # 只允许字母数字组合
+        raise ValueError("Invalid username format")
+    
+    # 安全地处理路径
+    safe_username = secure_filename(username)
+    if safe_username != username:
+        raise ValueError("Invalid username characters")
+    
+    # 构建安全路径
+    base_dir = os.path.abspath('user_files')
+    user_dir = os.path.join(base_dir, safe_username)
+    
+    # 验证路径是否在允许的目录下
+    if not os.path.abspath(user_dir).startswith(base_dir):
+        raise ValueError("Invalid path traversal attempt")
+    
+    return user_dir
+```
+
+## 修复原理和安全考虑
+
+1. **输入验证**：
+   - 使用`isalnum()`确保用户名只包含字母数字
+   - 使用`secure_filename`过滤特殊字符
+
+2. **路径安全**：
+   - 使用`os.path.abspath`获取绝对路径
+   - 验证最终路径是否在允许的基目录下
+
+3. **防御措施**：
+   - 防止路径遍历攻击
+   - 确保用户只能访问自己的目录
+   - 对异常输入进行严格拒绝
+
+## 最佳实践
+
+1. 永远不要信任用户输入
+2. 使用白名单而非黑名单进行验证
+3. 实施最小权限原则
+4. 在文件系统操作前进行路径规范化检查
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="跨站脚本 (XSS)">
+                <div class="card-header">
+                    <span>跨站脚本 (XSS)</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 39eef4e1-5b74-49d6-8df9-e28e68a6dc8e</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 35-47</p>
+                    <p><strong>描述:</strong> 代码直接将用户提供的username和文件内容插入到HTML响应中，没有进行任何转义处理。攻击者可以注入恶意脚本，当其他用户查看该页面时执行。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:35</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-39eef4e1-5b74-49d6-8df9-e28e68a6dc8e"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-39eef4e1-5b74-49d6-8df9-e28e68a6dc8e">return f"<h1>用户资料</h1><div>{username}</div><div>{content}</div>"</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            
+修复方案：对用户输入进行HTML转义处理
+
+修复后的代码：
+```python
+from html import escape
+
+return f"<h1>用户资料</h1><div>{escape(username)}</div><div>{escape(content)}</div>"
+```
+
+修改说明：
+1. 导入Python标准库的`html.escape`函数
+2. 对所有用户提供的变量(username和content)使用escape()进行转义处理
+
+安全原理：
+1. `escape()`函数会将特殊字符(&, <, >, ", ')转换为HTML实体(&amp;, &lt;, &gt;, &quot;, &#39;)
+2. 这样即使输入包含恶意脚本，也会被转义为纯文本显示而不会执行
+3. 安全考虑：
+- 对所有动态插入到HTML中的用户输入都要进行转义
+- 使用标准库函数而非自己实现转义逻辑
+- 遵循"默认转义"原则，明确标记安全内容而非不安全内容
+
+最佳实践：
+1. 在模板引擎中通常有自动转义功能(如Jinja2)
+2. 对于富文本内容，应使用专门的HTML净化库(如bleach)
+3. 设置Content-Security-Policy提供额外防护层
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="敏感信息泄露">
+                <div class="card-header">
+                    <span>敏感信息泄露</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> cf9efa36-e2cc-4191-89ec-ea2bcd42983b</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 35-47</p>
+                    <p><strong>描述:</strong> 函数可能泄露文件系统信息，包括文件是否存在以及文件内容，可能被攻击者利用进行信息收集。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:35</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-cf9efa36-e2cc-4191-89ec-ea2bcd42983b"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-cf9efa36-e2cc-4191-89ec-ea2bcd42983b">if os.path.exists(file_path):
+    with open(file_path, 'r') as f:
+        content = f.read()
+else:
+    content = "User not found"</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：限制文件访问权限，使用更安全的错误处理方式，避免泄露文件系统信息。
+
+修复后的代码示例：
+```python
+import os
+import logging
+
+def read_file_content(file_path):
+    try:
+        # 验证文件路径是否在允许的目录下
+        allowed_dir = '/safe/directory/'
+        if not os.path.abspath(file_path).startswith(allowed_dir):
+            raise ValueError("Invalid file path")
+            
+        # 使用二进制模式读取，避免编码问题
+        with open(file_path, 'rb') as f:
+            content = f.read()
+        return content.decode('utf-8', errors='replace')  # 安全解码
+    except (IOError, OSError, ValueError) as e:
+        logging.warning(f"File access error: {str(e)}")
+        return "Error processing request"  # 统一错误消息
+    except Exception as e:
+        logging.error(f"Unexpected error: {str(e)}")
+        return "Error processing request"
+```
+
+修复原理和安全考虑：
+1. 移除文件存在性检查 - 直接尝试读取文件，避免泄露文件是否存在的信息
+2. 添加路径验证 - 确保只能访问指定目录下的文件，防止目录遍历攻击
+3. 使用统一错误消息 - 不泄露具体错误细节给客户端
+4. 添加日志记录 - 记录错误信息用于内部审计
+5. 使用二进制模式读取 - 避免编码相关的安全问题
+6. 捕获所有可能的异常 - 防止信息通过异常泄露
+
+最佳实践：
+1. 遵循最小权限原则
+2. 实施输入验证
+3. 使用统一的错误处理
+4. 记录安全事件
+5. 避免暴露系统内部信息
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="XSS (跨站脚本攻击)">
+                <div class="card-header">
+                    <span>XSS (跨站脚本攻击)</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> a835f232-6e7b-4c5d-83ff-4d543f07ff2f</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 51-55</p>
+                    <p><strong>描述:</strong> 直接将用户输入(username和content)插入到HTML响应中，没有进行任何转义，可能导致恶意脚本执行。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:51</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-a835f232-6e7b-4c5d-83ff-4d543f07ff2f"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-a835f232-6e7b-4c5d-83ff-4d543f07ff2f">return f"<h1>用户资料</h1><div>{username}</div><div>{content}</div>"</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用 HTML 转义来防止 XSS 攻击
+
+修复后的代码：
+```python
+from html import escape
+
+return f"<h1>用户资料</h1><div>{escape(username)}</div><div>{escape(content)}</div>"
+```
+
+修改说明：
+1. 导入 Python 标准库的 `html.escape` 函数
+2. 对所有用户提供的输入(username和content)应用 `escape()` 函数
+
+安全原理：
+1. `escape()` 函数会将特殊字符转换为 HTML 实体，例如：
+   - `<` 转换为 `&lt;`
+   - `>` 转换为 `&gt;`
+   - `"` 转换为 `&quot;`
+   - `&` 转换为 `&amp;`
+2. 这样即使输入中包含恶意脚本，也会被转义为纯文本显示，而不会作为 HTML 或 JavaScript 执行
+
+最佳实践：
+1. 对所有动态插入到 HTML 中的用户输入都要进行转义
+2. 在显示层进行转义，而不是在存储层，以保持原始数据的完整性
+3. 考虑使用现代模板引擎(如Jinja2)，它们通常默认开启自动转义功能
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="敏感信息泄露">
+                <div class="card-header">
+                    <span>敏感信息泄露</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> d61c0693-a0c2-4fd9-9472-f4dc720c0f54</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 66-77</p>
+                    <p><strong>描述:</strong> 当文件不存在时，代码直接暴露完整的文件路径信息，这可能泄露服务器目录结构等敏感信息。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:66</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-d61c0693-a0c2-4fd9-9472-f4dc720c0f54"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-d61c0693-a0c2-4fd9-9472-f4dc720c0f54">if not os.path.exists(path):
+    return "File not found: " + path</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：使用通用错误信息替代具体的路径信息，避免泄露服务器目录结构。
+
+修复后的代码示例：
+```python
+if not os.path.exists(path):
+    return "File not found"  # 移除了具体的路径信息
+```
+
+安全考虑和修复原理：
+1. 信息最小化原则：只提供必要的错误信息，不暴露系统内部细节
+2. 防止路径遍历攻击：不显示完整路径可防止攻击者根据错误信息推测服务器目录结构
+3. 符合安全最佳实践：类似于"用户名或密码错误"的统一提示方式，不透露具体是哪个信息错误
+
+其他建议：
+1. 在生产环境中可以考虑记录详细错误到日志系统，而不是返回给客户端
+2. 可以进一步对path参数进行规范化验证，防止路径遍历攻击
+3. 对于需要调试的情况，可以通过不同的运行模式(开发/生产)来控制错误信息的详细程度
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+                    
+                
+            </div>
+            
+                                <div class="vuln-card" data-severity="medium" data-type="不安全的文件操作">
+                <div class="card-header">
+                    <span>不安全的文件操作</span>
+                    <span class="severity-badge badge-medium">中危</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>漏洞ID:</strong> 8a77a5e9-8095-455d-9e68-1297db7a3fc8</p>
+                    <p><strong>文件位置:</strong> <span class="file-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py</span></p>
+                    <p><strong>行范围:</strong> 66-77</p>
+                    <p><strong>描述:</strong> 直接以二进制模式读取并返回文件内容，没有检查文件类型或大小，可能导致服务器资源耗尽或返回敏感文件内容。</p>
+                    
+                    
+                                        <div class="code-header">
+                                            <span class="code-path">d:\Users\program\代码审计ai\AuditLuma\goalfile\example_test_code_examin.py:66</span>
+                                            <button class="code-copy" data-clipboard-target="#snippet-8a77a5e9-8095-455d-9e68-1297db7a3fc8"><i class="fas fa-copy"></i></button>
+                                        </div>
+                    <div class="code-section">
+                                            <pre id="snippet-8a77a5e9-8095-455d-9e68-1297db7a3fc8">with open(path, 'rb') as f:
+    return f.read()</pre>
+                    </div>
+                    
+                </div>
+                
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                
+                    
+                    <div class="card-footer">
+                                            <h4><i class="fas fa-tools"></i> 修复建议</h4>
+                        <div class="remediation-section">
+                            修复方案：添加文件大小限制和文件类型检查
+
+修复后的代码示例：
+```python
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_TYPES = {'.jpg', '.png', '.pdf'}  # 允许的文件扩展名
+
+def read_file_safely(path):
+    # 检查文件扩展名
+    if not any(path.lower().endswith(ext) for ext in ALLOWED_TYPES):
+        raise ValueError("Unsupported file type")
+    
+    # 检查文件大小
+    file_size = os.path.getsize(path)
+    if file_size > MAX_FILE_SIZE:
+        raise ValueError("File too large")
+    
+    # 安全读取文件
+    with open(path, 'rb') as f:
+        return f.read()
+```
+
+安全修复说明：
+1. 文件类型检查：通过白名单机制限制只能读取特定类型的文件，防止读取敏感文件(如/etc/passwd)
+2. 文件大小限制：防止大文件导致内存耗尽(DoS攻击)
+3. 使用绝对路径检查：建议进一步验证path是否为预期目录下的文件(未在示例中展示)
+4. 错误处理：通过明确的异常提供安全反馈而非直接暴露系统错误
+
+额外建议：
+- 考虑使用`os.path.abspath`确保路径在允许的目录内
+- 对于Web应用，建议结合上传时的验证而非仅依赖读取时验证
+- 记录安全违规尝试以便监控异常行为
+
+**注意**: 此修复仅针对所识别的漏洞。请确保全面审查代码以识别可能存在的其他安全问题。
+                        </div>
+                    </div>
+                    
+                
+            </div>
+            
+                            </div>
+            
+            
+                            <!-- 低危漏洞 -->
+            
+            
+                            <!-- 信息提醒 -->
+            
+                        </div>
+                    </div>
+        </section>
+        
+                <!-- 依赖关系部分 -->
+                
+                <section id="dependency" class="card">
+                <div class="card-header">
+                        <h2><i class="fas fa-project-diagram"></i> 代码依赖关系</h2>
+                </div>
+                <div class="card-body">
+                        <div id="dependency-chart" style="width: 100%; height: 500px;"></div>
+                        <p class="chart-note">
+                            <i class="fas fa-info-circle"></i> 此图显示了项目中各组件之间的依赖关系，可用于理解代码结构和识别潜在安全风险点。
+                        </p>
+                </div>
+                </section>
+                
+                
+                <!-- 安全建议部分 -->
+                <section id="recommendations" class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-lightbulb"></i> 安全建议</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>安全最佳实践</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="recommendations-grid">
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-filter"></i></div>
+                                        <h4>输入验证</h4>
+                                        <p>验证所有来自外部来源的数据，确保它们符合预期格式和长度，防止注入类攻击。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-code"></i></div>
+                                        <h4>输出编码</h4>
+                                        <p>对所有输出到用户界面的数据进行适当的编码，防止XSS等攻击。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-database"></i></div>
+                                        <h4>参数化查询</h4>
+                                        <p>使用参数化查询和预处理语句，防止SQL注入攻击。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-user-shield"></i></div>
+                                        <h4>身份验证和授权</h4>
+                                        <p>实施强大的身份验证机制，并确保适当的授权检查。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-key"></i></div>
+                                        <h4>安全密码存储</h4>
+                                        <p>使用强哈希算法(如bcrypt)存储密码，并使用盐值增加安全性。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-lock"></i></div>
+                                        <h4>敏感数据保护</h4>
+                                        <p>对敏感数据进行加密存储和传输，使用适当的加密算法和密钥管理。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-cogs"></i></div>
+                                        <h4>安全配置</h4>
+                                        <p>确保应用程序和服务器配置遵循安全最佳实践，移除默认账户和不必要服务。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-exclamation-circle"></i></div>
+                                        <h4>错误处理</h4>
+                                        <p>实现安全的错误处理，避免泄露敏感信息，记录错误但对用户显示通用信息。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-clipboard-list"></i></div>
+                                        <h4>日志记录和监控</h4>
+                                        <p>记录安全相关事件并定期审查日志，实施监控以便及时发现异常活动。</p>
+                                    </div>
+                                    
+                                    <div class="recommendation-item">
+                                        <div class="icon"><i class="fas fa-boxes"></i></div>
+                                        <h4>依赖管理</h4>
+                                        <p>定期更新和审计第三方依赖，修复已知漏洞，使用软件成分分析工具。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 项目特定建议 -->
+                        
+                        <div class="card" style="margin-top: 20px;">
+                            <div class="card-header">
+                                <h3>项目特定建议</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="timeline">
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <h4></h4>
+                                            <p></p>
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                            </div>
+                        </div>
+                        
+            </div>
+        </section>
+                
+                <!-- 统计数据部分 -->
+                <section id="statistics" class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-chart-pie"></i> 统计数据</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="charts-section">
+                            <div class="chart-container">
+                                <h3>漏洞严重程度分布</h3>
+                                <canvas id="severity-dist-chart"></canvas>
+                            </div>
+                            
+                            <div class="chart-container">
+                                <h3>最常见漏洞类型</h3>
+                                <canvas id="vulnerability-types-chart"></canvas>
+                            </div>
+                            
+                            <div class="chart-container">
+                                <h3>文件复杂度分布</h3>
+                                <canvas id="complexity-chart"></canvas>
+                            </div>
+                            
+                            <div class="chart-container">
+                                <h3>每日发现漏洞数量</h3>
+                                <canvas id="daily-vulns-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        
+        <footer>
+            <p>由 <strong>AuditLuma</strong> 安全审计系统生成 | 2025-05-01 10:42:07</p>
+            <p><small>版本 1.0.0 | <a href="https://github.com/yourusername/auditluma" target="_blank">GitHub</a></small></p>
+        </footer>
+    </div>
+    
+    <!-- 脚本 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.3.2/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化剪贴板
+            new ClipboardJS('.code-copy').on('success', function(e) {
+                const button = e.trigger;
+                const icon = button.querySelector('i');
+                
+                icon.classList.remove('fa-copy');
+                icon.classList.add('fa-check');
+                
+                setTimeout(() => {
+                    icon.classList.remove('fa-check');
+                    icon.classList.add('fa-copy');
+                }, 2000);
+            });
+            
+            // 导航菜单激活状态
+            const navLinks = document.querySelectorAll('.nav-menu a');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            // 添加点击事件到漏洞卡片标题
+            document.querySelectorAll('.vuln-card .card-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const card = this.closest('.vuln-card');
+                    card.classList.toggle('expanded');
+                });
+            });
+            
+            // 默认展开所有卡片
+            document.querySelectorAll('.vuln-card').forEach(card => {
+                card.classList.add('expanded');
+            });
+            
+            // 添加漏洞类型过滤器
+            const vulnTypes = new Set();
+            document.querySelectorAll('.vuln-card').forEach(card => {
+                vulnTypes.add(card.getAttribute('data-type'));
+            });
+            
+            const vulnTypeFilters = document.getElementById('vulnTypeFilters');
+            Array.from(vulnTypes).sort().forEach((type, index) => {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `filter-type-${index}`;
+                checkbox.className = 'filter-checkbox';
+                checkbox.checked = true;
+                checkbox.setAttribute('data-type', type);
+                
+                const label = document.createElement('label');
+                label.htmlFor = `filter-type-${index}`;
+                label.className = 'filter-label';
+                label.textContent = type;
+                
+                vulnTypeFilters.appendChild(checkbox);
+                vulnTypeFilters.appendChild(label);
+            });
+            
+            // 过滤功能
+            const filterVulnerabilities = () => {
+                const severityFilters = Array.from(document.querySelectorAll('.filter-checkbox[data-severity]:checked')).map(el => el.getAttribute('data-severity'));
+                const typeFilters = Array.from(document.querySelectorAll('.filter-checkbox[data-type]:checked')).map(el => el.getAttribute('data-type'));
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+                
+                document.querySelectorAll('.vuln-card').forEach(card => {
+                    const severity = card.getAttribute('data-severity');
+                    const type = card.getAttribute('data-type');
+                    const text = card.textContent.toLowerCase();
+                    
+                    const severityMatch = severityFilters.includes(severity);
+                    const typeMatch = typeFilters.includes(type);
+                    const searchMatch = searchTerm === '' || text.includes(searchTerm);
+                    
+                    card.style.display = (severityMatch && typeMatch && searchMatch) ? 'block' : 'none';
+                });
+                
+                // 更新各严重程度部分可见性
+                document.querySelectorAll('.severity-section').forEach(section => {
+                    const sectionSeverity = section.getAttribute('data-severity');
+                    const hasVisibleCards = Array.from(section.querySelectorAll('.vuln-card')).some(card => card.style.display !== 'none');
+                    section.style.display = hasVisibleCards ? 'block' : 'none';
+                });
+            };
+            
+            // 添加过滤器事件监听
+            document.querySelectorAll('.filter-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', filterVulnerabilities);
+            });
+            
+            document.getElementById('searchInput').addEventListener('input', filterVulnerabilities);
+            
+            // 展开/折叠按钮
+            document.getElementById('expandAll').addEventListener('click', function() {
+                document.querySelectorAll('.vuln-card').forEach(card => {
+                    card.classList.add('expanded');
+                });
+            });
+            
+            document.getElementById('collapseAll').addEventListener('click', function() {
+                document.querySelectorAll('.vuln-card').forEach(card => {
+                    card.classList.remove('expanded');
+                });
+            });
+            
+            // 漏洞类型分布图
+            const vulnerabilityCtx = document.getElementById('vulnerability-chart').getContext('2d');
+            const vulnTypeLabels = ["SQL\u6ce8\u5165", "\u8def\u5f84\u904d\u5386", "XSS (\u8de8\u7ad9\u811a\u672c)", "\u547d\u4ee4\u6ce8\u5165", "\u5f31\u5bc6\u7801\u68c0\u67e5", "\u76ee\u5f55\u904d\u5386", "\u654f\u611f\u4fe1\u606f\u6cc4\u9732", "\u4e0d\u5b89\u5168\u914d\u7f6e", "\u4e0d\u5b89\u5168\u7684\u76f4\u63a5\u5bf9\u8c61\u5f15\u7528", "\u8de8\u7ad9\u811a\u672c(XSS)", "\u8def\u5f84\u904d\u5386 (Path Traversal)", "\u8de8\u7ad9\u811a\u672c (XSS)", "XSS (\u8de8\u7ad9\u811a\u672c\u653b\u51fb)", "\u5f31\u5bc6\u7801\u7b56\u7565", "\u786c\u7f16\u7801\u51ed\u8bc1", "\u76ee\u5f55\u904d\u5386 (Path Traversal)", "\u4e0d\u5b89\u5168\u7684\u6587\u4ef6\u64cd\u4f5c"];
+            const vulnTypeCounts = [4, 4, 2, 4, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+            
+            new Chart(vulnerabilityCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: vulnTypeLabels,
+                    datasets: [{
+                        data: vulnTypeCounts,
+                        backgroundColor: [
+                            '#00c0f5', // 网安蓝
+                            '#60b5f0', // 浅蓝
+                            '#50a6e6', // 蓝色
+                            '#7ad84e', // 绿色
+                            '#ffbd59', // 黄色
+                            '#ff9e58', // 橙色
+                            '#ff6b6b', // 网安红
+                            '#d456ff', // 紫色
+                            '#59c0ff', // 湖蓝
+                            '#c5c3c6'  // 浅灰
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                padding: 20,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: '漏洞类型分布',
+                            font: {
+                                size: 16
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 漏洞严重程度分布图
+            const severityCtx = document.getElementById('severity-dist-chart').getContext('2d');
+            const severityCounts = [
+                13, 
+                10, 
+                0
+            ];
+            
+            new Chart(severityCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['高危', '中危', '低危'],
+                    datasets: [{
+                        data: severityCounts,
+                        backgroundColor: ['#ff6b6b', '#ffbd59', '#7ad84e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // 最常见漏洞类型图
+            const vulnTypesCtx = document.getElementById('vulnerability-types-chart').getContext('2d');
+            const commonVulnLabels = ["SQL\u6ce8\u5165", "\u8def\u5f84\u904d\u5386", "\u547d\u4ee4\u6ce8\u5165", "\u654f\u611f\u4fe1\u606f\u6cc4\u9732", "XSS (\u8de8\u7ad9\u811a\u672c)"];
+            const commonVulnCounts = [4, 4, 4, 3, 2];
+            
+            new Chart(vulnTypesCtx, {
+                type: 'bar',
+                data: {
+                    labels: commonVulnLabels,
+                    datasets: [{
+                        label: '漏洞数量',
+                        data: commonVulnCounts,
+                        backgroundColor: '#00c0f5',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: {
+                                display: true,
+                                drawBorder: false
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 文件复杂度分布图
+            const complexityCtx = document.getElementById('complexity-chart').getContext('2d');
+            const complexityLabels = ["\u4f4e", "\u4e2d", "\u9ad8", "\u975e\u5e38\u9ad8"];
+            const complexityCounts = [20, 15, 10, 5];
+            
+            new Chart(complexityCtx, {
+                type: 'bar',
+                data: {
+                    labels: complexityLabels,
+                    datasets: [{
+                        label: '文件数量',
+                        data: complexityCounts,
+                        backgroundColor: '#00c0f5',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                display: true,
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 每日发现漏洞数量
+            const dailyVulnsCtx = document.getElementById('daily-vulns-chart').getContext('2d');
+            const dailyLabels = ["6\u5929\u524d", "5\u5929\u524d", "4\u5929\u524d", "3\u5929\u524d", "2\u5929\u524d", "1\u5929\u524d", "\u4eca\u5929"];
+            
+            // 准备每日漏洞数据
+            const highData = [];
+            const mediumData = [];
+            const lowData = [];
+            
+            
+                highData.push(0);
+                mediumData.push(0);
+                lowData.push(0);
+            
+                highData.push(0);
+                mediumData.push(0);
+                lowData.push(0);
+            
+                highData.push(0);
+                mediumData.push(0);
+                lowData.push(0);
+            
+                highData.push(0);
+                mediumData.push(0);
+                lowData.push(0);
+            
+                highData.push(0);
+                mediumData.push(0);
+                lowData.push(0);
+            
+                highData.push(0);
+                mediumData.push(0);
+                lowData.push(0);
+            
+                highData.push(13);
+                mediumData.push(10);
+                lowData.push(0);
+            
+            
+            new Chart(dailyVulnsCtx, {
+                type: 'line',
+                data: {
+                    labels: dailyLabels,
+                    datasets: [
+                        {
+                            label: '高危',
+                            data: highData,
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '中危',
+                            data: mediumData,
+                            borderColor: '#ffbd59',
+                            backgroundColor: 'rgba(255, 189, 89, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '低危',
+                            data: lowData,
+                            borderColor: '#7ad84e',
+                            backgroundColor: 'rgba(122, 216, 78, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            stacked: false
+                        }
+                    }
+                }
+            });
+
+            // 依赖关系图
+            
+            const dependencyChart = echarts.init(document.getElementById('dependency-chart'));
+            const dependencyOption = {"title": {"text": "\u4ee3\u7801\u4f9d\u8d56\u5173\u7cfb\u56fe"}, "tooltip": {}, "legend": {"data": ["function", "class", "module", "unknown"]}, "animationDurationUpdate": 1500, "animationEasingUpdate": "quinticInOut", "series": [{"type": "graph", "layout": "force", "data": [{"id": "file_4852504881ae48f8b6ea92cd18128a1c", "name": "example_test_code_examin.py", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "file"}, {"id": "function_82da8db18222477fa1f37b325670e263", "name": "index", "symbolSize": 30, "itemStyle": {"color": "#2a86db"}, "symbol": "circle", "category": "function"}, {"id": "function_a681e65cbafe4808bb558a92d1b5291a", "name": "search", "symbolSize": 30, "itemStyle": {"color": "#2a86db"}, "symbol": "circle", "category": "function"}, {"id": "function_d78fe4dbd2e94f1daa9ae2f66695e774", "name": "profile", "symbolSize": 30, "itemStyle": {"color": "#2a86db"}, "symbol": "circle", "category": "function"}, {"id": "function_acd1abb446ee4358b60011a996503d44", "name": "execute_command", "symbolSize": 30, "itemStyle": {"color": "#2a86db"}, "symbol": "circle", "category": "function"}, {"id": "function_d98118ea7b9a4471adfe7ad0340d31b4", "name": "insecure_auth", "symbolSize": 30, "itemStyle": {"color": "#2a86db"}, "symbol": "circle", "category": "function"}, {"id": "function_e8488139497e4fa390860fd892c2e28e", "name": "download_file", "symbolSize": 30, "itemStyle": {"color": "#2a86db"}, "symbol": "circle", "category": "function"}, {"id": "external_41e7db80508c", "name": "render_template", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_60e9ae0ced92", "name": "'index.html'", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_10573b873d2f", "name": "request", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_dd302f94682d", "name": "os", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_dfff0a7fa1a5", "name": "cmd", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_78e6221f6393", "name": "output", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_14c4b06b824e", "name": "username", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_5f4dcc3b5aa7", "name": "password", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_a4162c5c10d3", "name": "\"admin123\"", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_7cef8a734855", "name": "open", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_f31899f73b91", "name": "f.read", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_97fd815a3803", "name": "file_path", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_9a0364b9e99b", "name": "content", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_dc2deb24fc98", "name": "sqlite3", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_881b5057b844", "name": "request.args.get", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_ef620917e5f8", "name": "sqlite3.connect", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_2faca02581e3", "name": "conn.cursor", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_3b7c7e9db144", "name": "cursor.execute", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_27b3545c0b89", "name": "cursor.fetchall", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_2ff2062142ef", "name": "conn.close", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_1b1cc7f086b3", "name": "query", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_53e61336bb49", "name": "results", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_15c2d464c25b", "name": "flask.Flask", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_8d361200aa84", "name": "flask.request", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_607326864dfa", "name": "flask.render_template", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_082a1c0941d2", "name": "Flask.__init__", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_7a4b2d06d6af", "name": "app.route", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_4fc5be61fe7a", "name": "os.path.join", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_0d6235231c4d", "name": "os.path.exists", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_205069b6f6b4", "name": "os.popen", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_e1643db5230a", "name": "app.run", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}, {"id": "external_435ed7e9f07f", "name": "filename", "symbolSize": 30, "itemStyle": {"color": "#6c757d"}, "symbol": "diamond", "category": "external"}], "links": [{"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_dd302f94682d"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_dc2deb24fc98"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_15c2d464c25b"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_8d361200aa84"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_607326864dfa"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_082a1c0941d2"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_7a4b2d06d6af"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_41e7db80508c"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_881b5057b844"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_ef620917e5f8"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_3b7c7e9db144"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_27b3545c0b89"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_2ff2062142ef"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_4fc5be61fe7a"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_0d6235231c4d"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_7cef8a734855"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_f31899f73b91"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_205069b6f6b4"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_e1643db5230a"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_1b1cc7f086b3"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_14c4b06b824e"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_9a0364b9e99b"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_dfff0a7fa1a5"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_435ed7e9f07f"}, {"source": "file_4852504881ae48f8b6ea92cd18128a1c", "target": "external_97fd815a3803"}, {"source": "function_82da8db18222477fa1f37b325670e263", "target": "external_41e7db80508c"}, {"source": "function_82da8db18222477fa1f37b325670e263", "target": "external_60e9ae0ced92"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_10573b873d2f"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_dc2deb24fc98"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_41e7db80508c"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_881b5057b844"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_ef620917e5f8"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_2faca02581e3"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_3b7c7e9db144"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_27b3545c0b89"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_2ff2062142ef"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_1b1cc7f086b3"}, {"source": "function_a681e65cbafe4808bb558a92d1b5291a", "target": "external_53e61336bb49"}, {"source": "function_d78fe4dbd2e94f1daa9ae2f66695e774", "target": "external_10573b873d2f"}, {"source": "function_d78fe4dbd2e94f1daa9ae2f66695e774", "target": "external_dd302f94682d"}, {"source": "function_d78fe4dbd2e94f1daa9ae2f66695e774", "target": "external_7cef8a734855"}, {"source": "function_d78fe4dbd2e94f1daa9ae2f66695e774", "target": "external_14c4b06b824e"}, {"source": "function_d78fe4dbd2e94f1daa9ae2f66695e774", "target": "external_97fd815a3803"}, {"source": "function_d78fe4dbd2e94f1daa9ae2f66695e774", "target": "external_9a0364b9e99b"}, {"source": "function_acd1abb446ee4358b60011a996503d44", "target": "external_10573b873d2f"}, {"source": "function_acd1abb446ee4358b60011a996503d44", "target": "external_dd302f94682d"}, {"source": "function_acd1abb446ee4358b60011a996503d44", "target": "external_dfff0a7fa1a5"}, {"source": "function_acd1abb446ee4358b60011a996503d44", "target": "external_78e6221f6393"}, {"source": "function_d98118ea7b9a4471adfe7ad0340d31b4", "target": "external_14c4b06b824e"}, {"source": "function_d98118ea7b9a4471adfe7ad0340d31b4", "target": "external_5f4dcc3b5aa7"}, {"source": "function_d98118ea7b9a4471adfe7ad0340d31b4", "target": "external_a4162c5c10d3"}, {"source": "function_e8488139497e4fa390860fd892c2e28e", "target": "external_10573b873d2f"}, {"source": "function_e8488139497e4fa390860fd892c2e28e", "target": "external_dd302f94682d"}, {"source": "function_e8488139497e4fa390860fd892c2e28e", "target": "external_7cef8a734855"}, {"source": "function_e8488139497e4fa390860fd892c2e28e", "target": "external_f31899f73b91"}], "categories": [{"name": "function"}, {"name": "class"}, {"name": "module"}, {"name": "unknown"}], "roam": true, "label": {"show": true, "position": "right", "formatter": "{b}"}, "force": {"repulsion": 100}}]};
+            dependencyChart.setOption(dependencyOption);
+            
+            window.addEventListener('resize', function() {
+                dependencyChart.resize();
+            });
+            
+
+            // 平滑滚动
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        window.scrollTo({
+                            top: target.offsetTop - 20,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
