@@ -520,3 +520,6 @@ class RemediationAgent(BaseAgent):
         except Exception as e:
             logger.error(f"生成漏洞修复建议出错: {e}")
             return f"无法为此漏洞生成修复建议: {str(e)}"
+
+            return f"无法为此漏洞生成修复建议: {str(e)}"
+

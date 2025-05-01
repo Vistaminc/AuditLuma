@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AuditLuma安全审计报告 - {{ project_name }}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
     <style>
         :root {
             /* 主色调 */
@@ -328,15 +329,11 @@
             color: var(--secondary-color);
         }
         
-        /* 代码部分 */
+        /* 代码部分 - 已更新以支持高亮 */
         .code-section {
-            background-color: #292d3e;
-            padding: 15px;
-            border-radius: 5px;
+            background-color: transparent;
             margin: 10px 0;
             overflow-x: auto;
-            font-family: 'Fira Code', 'Courier New', monospace;
-            color: #d0d0d0;
             position: relative;
         }
         
@@ -349,7 +346,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: -5px;
             position: relative;
             z-index: 1;
         }
@@ -358,45 +354,99 @@
             opacity: 0.7;
         }
         
+        /* 添加Markdown安全显示样式 - 更新以支持高亮 */
+        .markdown-display {
+            background-color: var(--card-bg);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+        
+        .markdown-display pre {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            overflow-x: auto;
+            max-height: 400px;
+            background-color: transparent;
+            border-radius: 4px;
+        }
+        
+        .markdown-display code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: #f5f5f5;
+            color: var(--text-primary);
+            border-radius: 3px;
+            padding: 0.1em 0.3em;
+        }
+        
+        .markdown-display blockquote {
+            border-left: 3px solid var(--primary-color);
+            margin: 1rem 0;
+            padding: 0.5rem 0 0.5rem 1rem;
+            color: var(--text-secondary);
+        }
+        
+        /* 高亮代码块样式 */
+        .markdown-display .hljs {
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        /* 一键复制样式 */
         .code-copy {
             background: none;
             border: none;
             color: #a0a0a0;
             cursor: pointer;
             transition: color 0.2s ease;
+            z-index: 10;
         }
         
         .code-copy:hover {
             color: white;
         }
         
-        .code-line {
-            display: block;
-            white-space: pre;
-            line-height: 1.5;
-        }
-        
-        .line-number {
-            display: inline-block;
-            width: 30px;
-            margin-right: 10px;
-            text-align: right;
-            color: #606060;
-            user-select: none;
-        }
-        
-        /* 文件路径 */
-        .file-path {
-            font-family: 'Fira Code', monospace;
-            background-color: rgba(0,0,0,0.05);
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 0.9em;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        /* 确保代码区域可滚动但不溢出 */
+        .code-section {
             max-width: 100%;
-            display: inline-block;
+            overflow-x: auto;
+        }
+        
+        .code-section pre {
+            overflow-x: auto;
+            word-wrap: normal;
+        }
+        
+        /* Markdown中语法高亮代码块 */
+        .markdown-content {
+            padding: 1rem;
+        }
+        
+        .markdown-content p {
+            margin-bottom: 1rem;
+        }
+        
+        .markdown-content h1, 
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4 {
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .markdown-content ul,
+        .markdown-content ol {
+            margin-left: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .markdown-content code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            padding: 0.2em 0.4em;
+            background-color: rgba(0,0,0,0.05);
+            border-radius: 3px;
         }
         
         /* 图表容器 */
@@ -808,8 +858,8 @@
                                             <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
                                             <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
                                         </div>
-                    <div class="code-section">
-                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
+                    <div class="code-section markdown-display">
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet|e }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -818,8 +868,8 @@
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
                                             <h4><i class="fas fa-tools"></i> 修复建议</h4>
-                        <div class="remediation-section">
-                            {{ remediation.specific_remediation|safe }}
+                        <div class="remediation-section markdown-display">
+                            {{ remediation.specific_remediation|e }}
                         </div>
                     </div>
                     {% endif %}
@@ -850,8 +900,8 @@
                                             <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
                                             <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
                                         </div>
-                    <div class="code-section">
-                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
+                    <div class="code-section markdown-display">
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet|e }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -860,8 +910,8 @@
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
                                             <h4><i class="fas fa-tools"></i> 修复建议</h4>
-                        <div class="remediation-section">
-                            {{ remediation.specific_remediation|safe }}
+                        <div class="remediation-section markdown-display">
+                            {{ remediation.specific_remediation|e }}
                         </div>
                     </div>
                     {% endif %}
@@ -892,8 +942,8 @@
                                             <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
                                             <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
                                         </div>
-                    <div class="code-section">
-                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
+                    <div class="code-section markdown-display">
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet|e }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -902,8 +952,8 @@
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
                                             <h4><i class="fas fa-tools"></i> 修复建议</h4>
-                        <div class="remediation-section">
-                            {{ remediation.specific_remediation|safe }}
+                        <div class="remediation-section markdown-display">
+                            {{ remediation.specific_remediation|e }}
                         </div>
                     </div>
                     {% endif %}
@@ -934,8 +984,8 @@
                                             <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
                                             <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
                                         </div>
-                    <div class="code-section">
-                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
+                    <div class="code-section markdown-display">
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet|e }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -944,8 +994,8 @@
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
                                             <h4><i class="fas fa-tools"></i> 修复建议</h4>
-                        <div class="remediation-section">
-                            {{ remediation.specific_remediation|safe }}
+                        <div class="remediation-section markdown-display">
+                            {{ remediation.specific_remediation|e }}
                         </div>
                     </div>
                     {% endif %}
@@ -976,8 +1026,8 @@
                                             <span class="code-path">{{ vuln.file_path }}:{{ vuln.start_line }}</span>
                                             <button class="code-copy" data-clipboard-target="#snippet-{{ vuln.id }}"><i class="fas fa-copy"></i></button>
                                         </div>
-                    <div class="code-section">
-                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet }}</pre>
+                    <div class="code-section markdown-display">
+                                            <pre id="snippet-{{ vuln.id }}">{{ vuln.snippet|e }}</pre>
                     </div>
                     {% endif %}
                 </div>
@@ -986,8 +1036,8 @@
                     {% if remediation.vulnerability_id == vuln.id %}
                     <div class="card-footer">
                                             <h4><i class="fas fa-tools"></i> 修复建议</h4>
-                        <div class="remediation-section">
-                            {{ remediation.specific_remediation|safe }}
+                        <div class="remediation-section markdown-display">
+                            {{ remediation.specific_remediation|e }}
                         </div>
                     </div>
                     {% endif %}
@@ -1109,8 +1159,8 @@
                                                 <span>修复示例</span>
                                                 <button class="code-copy" data-clipboard-target="#remediation-{{ loop.index }}"><i class="fas fa-copy"></i></button>
                                             </div>
-                                            <div class="code-section">
-                                                <pre id="remediation-{{ loop.index }}">{{ remediation.code_example }}</pre>
+                                            <div class="code-section markdown-display">
+                                                <pre id="remediation-{{ loop.index }}">{{ remediation.code_example|e }}</pre>
                                             </div>
                                             {% endif %}
                                         </div>
@@ -1165,6 +1215,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.3.2/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/php.min.js"></script>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -1527,6 +1585,113 @@
                     }
                 });
             });
+
+            // 代码高亮和Markdown处理
+            function processMarkdownCode() {
+                // 处理所有代码区域
+                document.querySelectorAll('.code-section pre').forEach(function(pre) {
+                    // 检查是否是Markdown格式的代码块
+                    const content = pre.textContent;
+                    if (content.trim().startsWith('```')) {
+                        // 提取语言和代码内容
+                        const match = content.match(/```(\w*)\n([\s\S]*?)```/);
+                        if (match) {
+                            const language = match[1] || 'plaintext';
+                            const code = match[2];
+                            
+                            // 创建新的代码元素
+                            const codeElement = document.createElement('code');
+                            codeElement.className = `language-${language}`;
+                            codeElement.textContent = code;
+                            
+                            // 替换原内容
+                            pre.innerHTML = '';
+                            pre.appendChild(codeElement);
+                            
+                            // 应用高亮
+                            hljs.highlightElement(codeElement);
+                        }
+                    } else {
+                        // 普通代码块，直接应用高亮
+                        const codeElement = document.createElement('code');
+                        codeElement.textContent = content;
+                        
+                        // 尝试检测语言
+                        let language = 'plaintext';
+                        if (content.includes('def ') || content.includes('import ')) {
+                            language = 'python';
+                        } else if (content.includes('function') || content.includes('var ')) {
+                            language = 'javascript';
+                        } else if (content.includes('<html') || content.includes('</div>')) {
+                            language = 'xml';
+                        } else if (content.includes('@media') || content.includes('{')) {
+                            language = 'css';
+                        }
+                        
+                        codeElement.className = `language-${language}`;
+                        
+                        // 替换原内容
+                        pre.innerHTML = '';
+                        pre.appendChild(codeElement);
+                        
+                        // 应用高亮
+                        hljs.highlightElement(codeElement);
+                    }
+                });
+                
+                // 处理所有修复建议
+                document.querySelectorAll('.remediation-section').forEach(function(section) {
+                    const content = section.textContent;
+                    
+                    // 将内容解析为Markdown
+                    let html = content;
+                    
+                    // 1. 处理代码块
+                    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(match, language, code) {
+                        language = language || 'plaintext';
+                        return `<pre><code class="language-${language}">${escapeHtml(code)}</code></pre>`;
+                    });
+                    
+                    // 2. 处理内联代码
+                    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+                    
+                    // 3. 处理标题
+                    html = html.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
+                    html = html.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
+                    html = html.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
+                    
+                    // 4. 处理列表
+                    html = html.replace(/^\d+\. (.*?)$/gm, '<li>$1</li>');
+                    html = html.replace(/^- (.*?)$/gm, '<li>$1</li>');
+                    html = html.replace(/(<li>.*?<\/li>\n)+/g, '<ul>$&</ul>');
+                    
+                    // 5. 处理段落
+                    html = html.replace(/^(?!<[hou]).+$/gm, '<p>$&</p>');
+                    
+                    // 确保内容被包装在markdown-content中
+                    section.innerHTML = `<div class="markdown-content">${html}</div>`;
+                    
+                    // 对新内容应用代码高亮
+                    section.querySelectorAll('pre code').forEach(block => {
+                        hljs.highlightElement(block);
+                    });
+                });
+            }
+            
+            // HTML转义
+            function escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, m => map[m]);
+            }
+            
+            // 应用代码高亮和Markdown处理
+            processMarkdownCode();
         });
     </script>
 </body>

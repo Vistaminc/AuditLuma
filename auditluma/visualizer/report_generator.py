@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import base64
 import io
+import html
 
 from loguru import logger
 from jinja2 import Environment, FileSystemLoader
@@ -336,6 +337,21 @@ class ReportGenerator:
                 "total_count": len(vulnerabilities)
             }
             
+            # 处理漏洞数据，确保代码片段安全展示
+            for severity_list in vulns_by_severity.values():
+                for vuln in severity_list:
+                    # 处理代码片段，不必转义，模板中已经添加|e过滤器
+                    if hasattr(vuln, 'snippet') and vuln.snippet:
+                        # 将代码片段格式化为markdown代码块
+                        vuln.snippet = self._format_as_markdown_code(vuln.snippet, vuln.file_path)
+            
+            # 处理修复建议，确保安全展示
+            if remediation_data and "remediations" in remediation_data:
+                for remediation in remediation_data["remediations"]:
+                    if "specific_remediation" in remediation:
+                        # 将修复建议格式化为markdown，不必转义，模板中已经添加|e过滤器
+                        remediation["specific_remediation"] = self._format_as_markdown(remediation["specific_remediation"])
+            
             # 准备漏洞类型数据
             vuln_types = []
             vuln_type_counts = []
@@ -594,3 +610,92 @@ class ReportGenerator:
         except Exception as e:
             logger.error(f"准备依赖关系图数据时出错: {e}")
             return ""
+    
+    def _format_as_markdown_code(self, code: str, file_path: str = "") -> str:
+        """将代码片段格式化为Markdown代码块，确保安全显示"""
+        language = "plaintext"  # 默认为纯文本
+        
+        # 根据文件扩展名确定语言
+        if file_path:
+            ext = Path(file_path).suffix.lower()
+            language_map = {
+                ".py": "python",
+                ".js": "javascript",
+                ".jsx": "javascript",
+                ".ts": "typescript",
+                ".tsx": "typescript",
+                ".html": "html",
+                ".htm": "html",
+                ".css": "css",
+                ".java": "java",
+                ".cpp": "cpp",
+                ".c": "c",
+                ".h": "c",
+                ".hpp": "cpp",
+                ".php": "php",
+                ".go": "go",
+                ".rs": "rust",
+                ".rb": "ruby",
+                ".sh": "bash",
+                ".sql": "sql",
+                ".json": "json",
+                ".xml": "xml",
+                ".yaml": "yaml",
+                ".yml": "yaml"
+            }
+            language = language_map.get(ext, "plaintext")
+        else:
+            # 尝试检测代码内容确定语言
+            if "def " in code or "import " in code or "class " in code and ":" in code:
+                language = "python"
+            elif "function" in code or "var " in code or "const " in code or "let " in code:
+                language = "javascript"
+            elif "<html" in code or "</div>" in code:
+                language = "html"
+            elif "@media" in code or "{" in code and "}" in code and ";" in code:
+                language = "css"
+            elif "public class" in code or "private void" in code:
+                language = "java"
+            elif "SELECT" in code.upper() and "FROM" in code.upper():
+                language = "sql"
+        
+        # 格式化为markdown代码块，确保有语言标识
+        formatted_code = f"```{language}\n{code}\n```"
+        return formatted_code
+    
+    def _format_as_markdown(self, text: str) -> str:
+        """将文本格式化为Markdown，确保安全显示"""
+        # 检测并保留已有的markdown代码块格式
+        import re
+        
+        # 如果已经包含markdown代码块，检查是否有语言标识
+        if re.search(r'```\w*\n', text):
+            # 确保所有代码块都有语言标识
+            text = re.sub(r'```\s*\n', '```plaintext\n', text)
+            return text
+            
+        # 将普通文本包装为markdown格式
+        formatted_text = text
+        
+        # 确保建议代码部分使用代码块格式
+        code_patterns = [
+            (r'```.*?```', lambda m: m.group(0)),  # 已有代码块保持不变
+            (r'(?<!`)`[^`]+?`(?!`)', lambda m: m.group(0)),  # 已有内联代码保持不变
+            (r'(?m)^(\s*)(// .*)$', lambda m: f"{m.group(1)}`{m.group(2)}`"),  # 注释
+            (r'(?m)^(\s*)(# .*)$', lambda m: f"{m.group(1)}`{m.group(2)}`"),  # Python注释
+            (r'(?m)^(\s*)(import|from) .+', 
+             lambda m: f"```python\n{m.group(0)}\n```"),  # Python导入
+            (r'(?m)^(\s*)(function|const|let|var|class) .+(\{|\=).*$', 
+             lambda m: f"```javascript\n{m.group(0)}\n```"),  # JavaScript声明
+            (r'(?m)^(\s*)(def|class) .+(\:).*$', 
+             lambda m: f"```python\n{m.group(0)}\n```"),  # Python声明
+            (r'(?s)<[a-z]+[^>]*>.*?</[a-z]+>', 
+             lambda m: f"```html\n{m.group(0)}\n```"),  # HTML标签
+            (r'(?m)^(\s*)(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER).*$', 
+             lambda m: f"```sql\n{m.group(0)}\n```", re.IGNORECASE),  # SQL语句
+        ]
+        
+        for pattern, replacement in code_patterns:
+            formatted_text = re.sub(pattern, replacement, formatted_text, flags=re.MULTILINE)
+            
+        return formatted_text
