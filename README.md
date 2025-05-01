@@ -37,7 +37,7 @@ AuditLuma是一个智能代码审计系统，它利用多个AI代理和先进的
 克隆仓库并安装依赖：
 
 ```bash
-git clone https://github.com/yourusername/AuditLuma.git
+git clone https://github.com/Vistaminc/AuditLuma.git
 cd AuditLuma
 pip install -r requirements.txt
 ```
