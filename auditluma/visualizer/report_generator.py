@@ -1,13 +1,12 @@
 """
-报告生成器 - 生成HTML、PDF或JSON安全审计报告
+报告生成器 - 负责生成HTML/PDF格式的审计报告
 """
 
 import os
 import json
 import datetime
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from pathlib import Path
-import uuid
 import base64
 import io
 
@@ -20,7 +19,6 @@ import numpy as np
 
 from auditluma.config import Config
 from auditluma.models.code import VulnerabilityResult, SeverityLevel
-from auditluma.utils import init_llm_client
 
 
 class ReportGenerator:
@@ -28,34 +26,18 @@ class ReportGenerator:
     
     def __init__(self):
         """初始化报告生成器"""
-        from auditluma.config import Config
+        self.templates_dir = Path(__file__).parent / "templates"
+        self.env = Environment(loader=FileSystemLoader(str(self.templates_dir)))
         
         # 确保输出目录存在
-        output_dir = Path(Config.get_report_dir())
-        os.makedirs(output_dir, exist_ok=True)
-        self.output_dir = output_dir
+        self.output_dir = Path(Config.get_report_dir())
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # 设置报告格式
-        report_format = Config.get_report_format()
-        if report_format.lower() not in ["html", "pdf", "json"]:
-            logger.warning(f"不支持的报告格式: {report_format}，将使用HTML格式")
-            report_format = "html"
-        self.report_format = report_format.lower()
-        
-        # 设置Jinja2模板环境
-        from jinja2 import Environment, FileSystemLoader
-        templates_dir = Path(__file__).parent / "templates"
-        self.env = Environment(loader=FileSystemLoader(templates_dir))
-        
-        # 初始化LLM客户端，用于生成报告总结
-        from auditluma.utils import init_llm_client
-        # 使用总结任务默认模型，格式为"model@provider"
-        self.model_spec = Config.default_models.summarization
-        # 解析模型名称，只保存实际的模型名称部分
-        self.summary_model, _ = Config.parse_model_spec(self.model_spec)
-        # 初始化LLM客户端
-        self.llm_client = init_llm_client(self.model_spec)
-        logger.info(f"报告生成器使用总结模型: {self.summary_model}")
+        # 报告格式
+        self.report_format = Config.get_report_format().lower()
+        if self.report_format not in ["html", "pdf", "json"]:
+            logger.warning(f"不支持的报告格式: {self.report_format}，将使用HTML格式")
+            self.report_format = "html"
     
     def generate_report(self, 
                       vulnerabilities: List[VulnerabilityResult], 
@@ -612,221 +594,3 @@ class ReportGenerator:
         except Exception as e:
             logger.error(f"准备依赖关系图数据时出错: {e}")
             return ""
-
-    async def generate_report_async(self, 
-                      vulnerabilities: List[VulnerabilityResult], 
-                      dependency_graph: Any = None,
-                      remediation_data: Optional[Dict[str, Any]] = None,
-                      scan_info: Optional[Dict[str, Any]] = None) -> str:
-        """异步生成安全审计报告
-        
-        Args:
-            vulnerabilities: 发现的漏洞列表
-            dependency_graph: 代码依赖关系图(可选)
-            remediation_data: 修复建议数据(可选)
-            scan_info: 扫描信息(可选)
-            
-        Returns:
-            生成的报告文件路径
-        """
-        # 如果没有提供扫描信息，创建默认信息
-        if not scan_info:
-            scan_info = {
-                "project_name": Config.project.name,
-                "scan_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "scanned_files": 0,
-                "scanned_lines": 0,
-                "scan_duration": "unknown"
-            }
-        
-        # 按严重程度分组漏洞
-        vulns_by_severity = self._group_by_severity(vulnerabilities)
-        
-        # 准备图表数据
-        charts_data = self._prepare_charts_data(vulnerabilities)
-        
-        # 生成执行摘要
-        executive_summary = await self._generate_executive_summary(vulnerabilities, scan_info)
-        
-        # 生成报告内容
-        if self.report_format == "html":
-            return await self._generate_html_report_async(
-                vulnerabilities, 
-                vulns_by_severity,
-                dependency_graph,
-                remediation_data,
-                scan_info,
-                charts_data,
-                executive_summary
-            )
-        elif self.report_format == "pdf":
-            return self._generate_pdf_report(
-                vulnerabilities, 
-                vulns_by_severity,
-                dependency_graph,
-                remediation_data,
-                scan_info,
-                charts_data
-            )
-        else:  # json
-            return self._generate_json_report(
-                vulnerabilities, 
-                scan_info,
-                remediation_data
-            )
-
-    async def _generate_executive_summary(self, vulnerabilities: List[VulnerabilityResult], scan_info: Dict[str, Any]) -> str:
-        """生成报告执行摘要"""
-        if not vulnerabilities:
-            return "扫描未发现任何安全漏洞。"
-            
-        # 统计各严重程度漏洞数量
-        severity_counts = {severity.lower(): 0 for severity in SeverityLevel.__members__}
-        for vuln in vulnerabilities:
-            severity_counts[vuln.severity.lower()] += 1
-            
-        # 按漏洞类型分组
-        vuln_types = {}
-        for vuln in vulnerabilities:
-            if vuln.vulnerability_type not in vuln_types:
-                vuln_types[vuln.vulnerability_type] = 0
-            vuln_types[vuln.vulnerability_type] += 1
-            
-        # 查找最常见的漏洞类型
-        top_vuln_types = sorted(vuln_types.items(), key=lambda x: x[1], reverse=True)[:5]
-        
-        # 准备提示
-        system_prompt = """
-你是一位安全审计报告专家。根据提供的安全扫描信息，生成简洁、专业的执行摘要。
-摘要应该包含：
-1. 概述发现的漏洞总数和严重程度分布
-2. 指出最常见的漏洞类型及其潜在影响
-3. 提供高层次的安全状况评估
-
-保持简洁清晰，避免技术细节，使用专业且正式的语言。摘要长度应该在200-300字之间。
-"""
-
-        user_prompt = f"""
-项目: {scan_info.get('project_name', '未命名项目')}
-扫描日期: {scan_info.get('scan_date', '未知')}
-扫描文件数: {scan_info.get('scanned_files', 0)}
-扫描代码行数: {scan_info.get('scanned_lines', 0)}
-扫描时长: {scan_info.get('scan_duration', '未知')}
-
-漏洞总数: {len(vulnerabilities)}
-严重程度分布:
-- 严重: {severity_counts.get('critical', 0)}
-- 高危: {severity_counts.get('high', 0)}
-- 中危: {severity_counts.get('medium', 0)}
-- 低危: {severity_counts.get('low', 0)}
-- 信息: {severity_counts.get('info', 0)}
-
-最常见漏洞类型:
-{
-    '\\n'.join([f"- {vuln_type}: {count}件" for vuln_type, count in top_vuln_types])
-}
-
-根据以上信息，生成执行摘要。
-"""
-        
-        try:
-            # 使用指定的总结模型生成摘要
-            response = await self.llm_client.chat.completions.create(
-                model=self.model_spec,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.1
-            )
-            
-            summary = response.choices[0].message.content
-            return summary
-            
-        except Exception as e:
-            logger.error(f"生成执行摘要时出错: {e}")
-            return "无法生成执行摘要，请查看详细报告了解扫描结果。"
-            
-    async def _generate_html_report_async(self, 
-                      vulnerabilities: List[VulnerabilityResult],
-                      vulns_by_severity: Dict[str, List[VulnerabilityResult]],
-                      dependency_graph: Any,
-                      remediation_data: Optional[Dict[str, Any]],
-                      scan_info: Dict[str, Any],
-                      charts_data: Dict[str, Any],
-                      executive_summary: str) -> str:
-        """异步生成HTML格式的报告"""
-        # 准备模板数据
-        template_data = {
-            "project_name": scan_info.get("project_name", "AuditLuma项目"),
-            "scan_date": scan_info.get("scan_date", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            "scan_info": scan_info,
-            "executive_summary": executive_summary,
-            "vulnerabilities": vulnerabilities,
-            "vulnerabilities_by_severity": vulns_by_severity,
-            "total_vulnerabilities": len(vulnerabilities),
-            "stats": {
-                "high_count": len(vulns_by_severity.get("high", [])),
-                "medium_count": len(vulns_by_severity.get("medium", [])),
-                "low_count": len(vulns_by_severity.get("low", [])),
-                "info_count": len(vulns_by_severity.get("info", [])),
-                "critical_count": len(vulns_by_severity.get("critical", []))
-            }
-        }
-        
-        # 添加修复建议
-        if remediation_data:
-            template_data["remediations"] = remediation_data.get("remediations", [])
-        else:
-            template_data["remediations"] = []
-        
-        # 添加图表数据
-        vulns_by_type = {}
-        for vuln in vulnerabilities:
-            vuln_type = vuln.vulnerability_type
-            if vuln_type not in vulns_by_type:
-                vulns_by_type[vuln_type] = 0
-            vulns_by_type[vuln_type] += 1
-        
-        # 排序获取最常见的漏洞类型
-        common_types = sorted(vulns_by_type.items(), key=lambda x: x[1], reverse=True)[:10]
-        template_data["vuln_types"] = json.dumps([t[0] for t in common_types])
-        template_data["vuln_type_counts"] = json.dumps([t[1] for t in common_types])
-        
-        # 最常见的漏洞类型（饼图用）
-        template_data["common_vuln_types"] = json.dumps([t[0] for t in common_types[:5]])
-        template_data["common_vuln_counts"] = json.dumps([t[1] for t in common_types[:5]])
-        
-        # 复杂度分布
-        template_data["complexity_labels"] = json.dumps(["低", "中", "高"])
-        template_data["complexity_counts"] = json.dumps([10, 20, 5])  # 示例数据
-        
-        # 每日漏洞数据
-        daily_data = [
-            {"date": "2023-01-01", "high": 3, "medium": 5, "low": 2},
-            {"date": "2023-01-02", "high": 4, "medium": 3, "low": 6},
-            {"date": "2023-01-03", "high": 2, "medium": 7, "low": 4}
-        ]
-        template_data["daily_labels"] = json.dumps([d["date"] for d in daily_data])
-        template_data["daily_data"] = daily_data
-        
-        # 依赖关系数据
-        if dependency_graph:
-            template_data["dependency_data"] = self._prepare_dependency_data(dependency_graph)
-        else:
-            template_data["dependency_data"] = None
-        
-        # 使用模板渲染HTML
-        template = self.env.get_template("report_template.html")
-        report_html = template.render(**template_data)
-        
-        # 保存HTML文件
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_filename = f"{scan_info.get('project_name', 'AuditLuma项目')}_security_report_{timestamp}.html"
-        report_path = self.output_dir / report_filename
-        
-        with open(report_path, "w", encoding="utf-8") as f:
-            f.write(report_html)
-        
-        logger.info(f"HTML报告已生成: {report_path}")
-        return str(report_path)

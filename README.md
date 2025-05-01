@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.5-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.8+-yellow)
 
@@ -84,14 +84,43 @@ python main.py -d ./goalfile -o ./reports
 
 通过编辑`config/config.yaml`文件配置系统。主要配置项包括：
 
-### LLM配置
+### 模型规范格式
+
+AuditLuma支持使用统一的模型规范格式 `model@provider` 来指定模型和提供商：
+
+```
+deepseek-chat@deepseek  # 指定使用DeepSeek提供商的deepseek-chat模型
+gpt-4-turbo@openai      # 指定使用OpenAI提供商的gpt-4-turbo模型
+qwen-turbo@qwen         # 指定使用通义千问提供商的qwen-turbo模型
+```
+
+如果不指定提供商（不使用@符号），系统将自动根据模型名称推断提供商。
+
+### 配置文件示例
 
 ```yaml
-llm:
-  provider: "openai"  # 支持: openai, deepseek, moonshot, qwen, baichuan, zhipu, azure
-  base_url: "https://api.openai.com/v1"
-  api_key: ""  # API密钥
-  model: "gpt-4-turbo"  # 默认模型
+# 默认模型配置
+default_models:
+  code_analysis: "deepseek-chat@deepseek"   # 代码分析模型
+  security_audit: "gpt-4-turbo@openai"      # 安全审计模型
+  remediation: "deepseek-chat@deepseek"     # 修复建议模型
+  summarization: "qwen-turbo@qwen"          # 报告总结模型
+
+# Self-RAG配置
+self_rag:
+  enabled: true
+  embedding_model: "text-embedding-3-small@openai"  # 嵌入模型
+
+# 多智能体配置
+mcp:
+  enabled: true
+  agents:
+    - name: "orchestrator"
+      type: "coordinator"
+      model: "deepseek-chat@deepseek"  # 编排智能体使用的模型
+    - name: "security_analyst"
+      type: "analyst"
+      model: "gpt-4-turbo@openai"      # 安全分析智能体使用的模型
 ```
 
 ### 多厂商支持
@@ -105,6 +134,7 @@ AuditLuma支持多家LLM厂商，并能根据模型名称自动检测厂商：
 | `moonshot-` | 硅基流动 |
 | `qwen-` | 通义千问 |
 | `glm-`或`chatglm` | 智谱AI |
+| `baichuan` | 百川 |
 
 ## 💻 支持语言
 
