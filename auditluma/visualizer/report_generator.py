@@ -10,13 +10,20 @@ from pathlib import Path
 import base64
 import io
 import html
+import re
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
+
+# 设置matplotlib使用Agg后端（非交互式）
+matplotlib.use('Agg')
+
+# 配置matplotlib支持中文显示
+plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'SimSun']  # 按顺序寻找这些中文字体
+plt.rcParams['axes.unicode_minus'] = False  # 正确显示负号
 
 from loguru import logger
 from jinja2 import Environment, FileSystemLoader
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg')  # 使用非交互式后端
-import numpy as np
 
 from auditluma.config import Config
 from auditluma.models.code import VulnerabilityResult, SeverityLevel
