@@ -682,6 +682,9 @@ class AgentOrchestrator:
             # 按漏洞数量排序
             sorted_vuln_types = sorted(vuln_types.items(), key=lambda x: x[1], reverse=True)
             
+            # 预先格式化漏洞类型列表
+            vuln_types_text = "\n".join([f"- {vuln_type}: {count}件" for vuln_type, count in sorted_vuln_types[:5]])
+            
             # 调用LLM API生成摘要
             system_prompt = """
 你是一个安全报告总结专家。请根据提供的扫描结果，生成一个简明扼要的执行摘要。
@@ -707,9 +710,7 @@ class AgentOrchestrator:
 - 信息: {severity_counts.get('info', 0)}
 
 最常见漏洞类型:
-{
-    '\\n'.join([f"- {vuln_type}: {count}件" for vuln_type, count in sorted_vuln_types[:5]])
-}
+{vuln_types_text}
 
 风险评分: {assessment.get('risk_score', 0)}/100
 
