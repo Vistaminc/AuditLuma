@@ -117,6 +117,145 @@ class OpenAIEmbedder:
         return response.data[0].embedding
 
 
+class OllamaEmbedder:
+    """使用Ollama本地API的嵌入模型"""
+    def __init__(self, model_name: str = "mxbai-embed-large:latest", provider: str = None):
+        # 从model_name中解析模型名称和提供商（如果使用了model@provider格式）
+        parsed_model, parsed_provider = Config.parse_model_spec(model_name)
+        
+        # 如果从model_name解析出了提供商，优先使用它
+        if parsed_provider:
+            self.model_name = parsed_model
+            provider = parsed_provider
+            logger.info(f"从模型规范'{model_name}'中解析出模型名称'{parsed_model}'和提供商'{parsed_provider}'")
+        else:
+            self.model_name = model_name
+        
+        # 使用指定的提供商或默认使用ollama_emd提供商
+        provider = provider or "ollama_emd"
+        provider_config = Config.get_llm_provider_config(provider)
+        
+        # 确保使用正确的API端点，无论配置是什么
+        self.base_url = "http://localhost:11434/api/embeddings"
+        
+        # 初始化API客户端
+        import httpx
+        
+        # 创建带有超时设置的httpx客户端
+        timeout_settings = httpx.Timeout(
+            connect=30.0,
+            read=60.0,
+            write=30.0,
+            pool=15.0
+        )
+        self.http_client = httpx.AsyncClient(timeout=timeout_settings)
+        
+        logger.info(f"初始化Ollama嵌入模型: {self.model_name}, API地址: {self.base_url}")
+    
+    async def aembed(self, text: str) -> List[float]:
+        """异步生成嵌入向量且带有重试机制"""
+        # Ollama的embeddings API格式
+        payload = {
+            "model": self.model_name,
+            "input": text
+        }
+        
+        # 尝试不同的API格式
+        alternative_payloads = [
+            # 标准格式
+            {
+                "model": self.model_name,
+                "prompt": text
+            },
+            # 备选格式1，使用input而非prompt
+            {
+                "model": self.model_name,
+                "input": text
+            },
+            # 备选格式2，添加额外参数
+            {
+                "model": self.model_name,
+                "prompt": text,
+                "options": {"temperature": 0.0}
+            }
+        ]
+        
+        # 最大重试次数
+        max_retries = 3
+        retry_delay = 2  # 初始重试延迟（秒）
+        
+        # 首先尝试标准格式
+        current_payload = alternative_payloads[0]
+        
+        # 实现指数退避（exponential backoff）重试机制
+        for attempt in range(max_retries):
+            try:
+                # 发送POST请求到Ollama API
+                response = await self.http_client.post(
+                    self.base_url,
+                    json=current_payload,
+                    timeout=30.0  # 增加超时时间
+                )
+                
+                # 检查响应状态
+                response.raise_for_status()
+                response_data = response.json()
+                
+                # 从响应中提取嵌入向量
+                # Ollama API返回的是 {"embedding": [...]} 格式
+                if "embedding" in response_data:
+                    logger.info(f"成功生成嵌入向量，长度: {len(response_data['embedding'])}")
+                    return response_data["embedding"]
+                else:
+                    logger.error(f"Ollama嵌入响应格式错误: {response_data}")
+                    raise ValueError("嵌入响应中没有找到embedding字段")
+                    
+            except Exception as e:
+                error_str = str(e)
+                
+                # 如果是最后一次尝试或者已经尝试了所有可选格式
+                if attempt == max_retries - 1:
+                    logger.error(f"生成Ollama嵌入时出错 (重试{attempt+1}/{max_retries}): {e}")
+                    
+                    # 检查错误类型并提供详细信息
+                    if "500" in error_str:
+                        logger.error("服务器内部错误: 可能是模型不存在或配置错误 (尝试 'ollama pull mxbai-embed-large')")
+                    elif "503" in error_str:
+                        logger.error("服务不可用错误: 请确保Ollama正在运行且已加载嵌入模型")
+                    
+                    # 如果还有其他可选格式可以尝试
+                    payload_index = alternative_payloads.index(current_payload) + 1
+                    if payload_index < len(alternative_payloads):
+                        current_payload = alternative_payloads[payload_index]
+                        logger.info(f"尝试备选API格式 {payload_index}")
+                        # 重置尝试计数器
+                        attempt = 0
+                        continue
+                    else:
+                        # 所有格式均已尝试失败
+                        raise
+                
+                # 否则记录错误并准备重试
+                logger.warning(f"生成Ollama嵌入失败 (重试{attempt+1}/{max_retries}): {e}")
+                
+                # 等待一段时间后重试，并且使用指数退避算法增加重试间隔
+                import asyncio
+                await asyncio.sleep(retry_delay * (2 ** attempt))  # 2, 4, 8秒
+                
+                # 根据错误类型调整等待时间
+                if "503" in error_str:
+                    logger.info(f"检测到503错误，可能是模型正在加载，等待额外时间...")
+                    await asyncio.sleep(5)  # 额外等待5秒
+                elif "500" in error_str:
+                    logger.info(f"检测到500错误，可能是请求格式错误，尝试不同格式...")
+                    # 如果连续出现500错误，尝试切换请求格式
+                    payload_index = alternative_payloads.index(current_payload) + 1
+                    if payload_index < len(alternative_payloads):
+                        current_payload = alternative_payloads[payload_index]
+                        logger.info(f"切换到备选API格式 {payload_index}")
+                        # 不重置尝试计数器，继续正常重试流程
+
+
 class SimpleVectorStore:
     """一个简单的向量存储，当FAISS不可用时使用"""
     def __init__(self):
@@ -302,21 +441,34 @@ class SelfRAG:
         embedding_model = self.config.embedding_model
         
         try:
-            # 使用指定的嵌入模型（支持model@provider格式）
-            self.embedder = OpenAIEmbedder(model_name=embedding_model)
+            # 解析嵌入模型名称和提供商
+            model_name, provider = Config.parse_model_spec(embedding_model)
             
-            # 从配置中获取模型名称，可能已在OpenAIEmbedder中通过parse_model_spec解析
-            model_name = self.embedder.model_name
-            logger.info(f"使用嵌入模型: {model_name}")
+            # 根据提供商类型选择合适的嵌入模型
+            if provider == "ollama_emd":
+                # 尝试使用Ollama嵌入模型，但也准备了简单嵌入器作为后备
+                self.embedder = OllamaEmbedder(model_name=model_name, provider=provider)
+                # 创建后备嵌入器
+                self.fallback_embedder = SimpleEmbedder()
+                logger.info(f"使用Ollama嵌入模型: {model_name}(已准备后备嵌入器)")
+            else:
+                # 默认使用OpenAI兼容的嵌入模型
+                self.embedder = OpenAIEmbedder(model_name=embedding_model)
+                # 从配置中获取模型名称，可能已在OpenAIEmbedder中通过parse_model_spec解析
+                model_name = self.embedder.model_name
+                logger.info(f"使用嵌入模型: {model_name}")
         except Exception as e:
             logger.warning(f"无法初始化嵌入模型: {e}")
             self.embedder = SimpleEmbedder()
             logger.info("回退到简单嵌入模型")
         
+        # 确定嵌入维度 - Ollama mxbai-embed-large 使用1024维，OpenAI通常是1536维
+        embedding_dimensions = 1024 if provider == "ollama_emd" else 1536
+        
         # 初始化向量存储
         if self.config.vector_store == "faiss" and FAISS_AVAILABLE:
-            self.vector_store = FAISSVectorStore()
-            logger.info("使用FAISS向量存储")
+            self.vector_store = FAISSVectorStore(dimensions=embedding_dimensions)
+            logger.info(f"使用FAISS向量存储 (维度: {embedding_dimensions})")
         else:
             self.vector_store = SimpleVectorStore()
             logger.info("使用简单向量存储")
@@ -358,10 +510,22 @@ class SelfRAG:
         # 使用并发生成嵌入
         async def generate_embedding(doc):
             try:
+                # 尝试使用主要嵌入器
                 doc.embedding = await self.embedder.aembed(doc.content)
                 return doc
             except Exception as e:
                 logger.error(f"为文档生成嵌入时出错: {doc.id}, {e}")
+                
+                # 检查是否有后备嵌入器可用
+                if hasattr(self, "fallback_embedder") and self.fallback_embedder is not None:
+                    try:
+                        logger.warning(f"尝试使用后备嵌入器生成嵌入: {doc.id}")
+                        doc.embedding = await self.fallback_embedder.aembed(doc.content)
+                        return doc
+                    except Exception as fallback_error:
+                        logger.error(f"后备嵌入器也失败: {fallback_error}")
+                
+                # 如果后备也失败或没有后备，返回None
                 return None
 
         # 使用信号量限制并发数量，避免过多并发请求
@@ -422,12 +586,37 @@ class SelfRAG:
             }
         )
         
-        # 生成嵌入
-        doc.embedding = await self.embedder.aembed(doc.content)
+        # 生成嵌入（加入错误处理和后备机制）
+        try:
+            # 尝试使用主要嵌入器
+            doc.embedding = await self.embedder.aembed(doc.content)
+        except Exception as e:
+            logger.error(f"生成嵌入时出错: {unit.id}, {e}")
+            
+            # 检查是否有后备嵌入器可用
+            if hasattr(self, "fallback_embedder") and self.fallback_embedder is not None:
+                try:
+                    logger.warning(f"尝试使用后备嵌入器: {unit.id}")
+                    doc.embedding = await self.fallback_embedder.aembed(doc.content)
+                except Exception as fallback_error:
+                    logger.error(f"后备嵌入器也失败: {fallback_error}")
+                    # 如果后备也失败，使用空向量或抛出异常
+                    raise
         
-        # 添加到向量存储
-        self.vector_store.add([doc])
-        self.processed_files.add(unit.id)
+        # 确保嵌入向量存在再添加到向量存储
+        if doc.embedding is not None:
+            # 添加到向量存储
+            try:
+                self.vector_store.add([doc])
+                self.processed_files.add(unit.id)
+                logger.debug(f"成功添加代码单元到知识库: {unit.id}")
+            except Exception as store_error:
+                logger.error(f"添加到向量存储时出错: {unit.id}, {store_error}")
+                raise
+        else:
+            # 如果没有嵌入向量，仍然记录该文件为已处理
+            self.processed_files.add(unit.id)
+            logger.warning(f"添加了没有嵌入的代码单元: {unit.id}")
         
         logger.debug(f"已将代码单元添加到知识库: {unit.id}")
     
@@ -462,12 +651,15 @@ class SelfRAG:
                     logger.error(f"添加代码单元到知识库时出错: {unit.id}, {e}")
                     return False
         
-        # 并发处理所有单元
+        # 并发处理所有单元，但允许失败而不中断整个批处理
         tasks = [process_unit(unit) for unit in units_to_process]
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=False)
         
-        success_count = sum(1 for r in results if r)
+        # 计算成功的单元数量（返回 True 的结果数）
+        success_count = sum(1 for r in results if r is True)
         logger.info(f"成功添加 {success_count}/{len(units_to_process)} 个代码单元到知识库")
+        
+        # 即使有错误也继续处理，而不中断整个流程
     
     async def retrieve(self, query: str, k: int = 5) -> List[Tuple[Document, float]]:
         """检索与查询相关的文档"""

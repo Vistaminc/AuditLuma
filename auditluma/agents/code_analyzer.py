@@ -288,24 +288,77 @@ class CodeAnalyzerAgent(BaseAgent):
         """解析LLM返回的依赖分析结果"""
         dependencies = []
         
-        # 提取<依赖分析>标签之间的内容
+        # 首先尝试带标签的标准格式
         import re
         analysis_pattern = r"<依赖分析>(.*?)</依赖分析>"
         matches = re.search(analysis_pattern, analysis_text, re.DOTALL)
         
+        # 如果找不到标准格式，尝试其他可能的格式
         if not matches:
-            logger.warning(f"无法从LLM响应中提取依赖分析结果: {unit.name}")
-            return dependencies
-        
-        analysis_content = matches.group(1).strip()
+            # 尝试找到“依赖分析”或“Dependency Analysis”的段落
+            analysis_sections = [
+                r"依赖分析[\s\n:]*([\s\S]*?)(?=\n\n|\Z)",  # 中文段落标题
+                r"Dependency Analysis[\s\n:]*([\s\S]*?)(?=\n\n|\Z)",  # 英文段落标题
+                r"\n*([\s\S]*?依赖[\s\S]*?)(?=\n\n|\Z)",  # 包含“依赖”关键词的任何段落
+                r"\n*([\s\S]*?depend[\s\S]*?)(?=\n\n|\Z)"   # 包含“depend”关键词的任何段落
+            ]
+            
+            for pattern in analysis_sections:
+                section_match = re.search(pattern, analysis_text, re.IGNORECASE | re.DOTALL)
+                if section_match:
+                    logger.info(f"使用替代格式解析依赖分析: {unit.name}")
+                    analysis_content = section_match.group(1).strip()
+                    break
+            else:
+                # 如果所有格式都失败，使用整个文本
+                logger.warning(f"无法从LLM响应中提取标准依赖分析格式，尝试使用全文本: {unit.name}")
+                analysis_content = analysis_text.strip()
+        else:
+            # 使用标准格式提取的内容
+            analysis_content = matches.group(1).strip()
         
         # 检查是否未发现依赖关系
         if "未发现依赖关系" in analysis_content:
             return dependencies
         
-        # 提取各个依赖项
+        # 尝试多种方式提取依赖项
+        # 首先尝试标准的标签格式
         dependency_pattern = r"\[依赖\d+\](.*?)(?=\[依赖\d+\]|\Z)"
-        dependency_matches = re.finditer(dependency_pattern, analysis_content, re.DOTALL)
+        dependency_matches = list(re.finditer(dependency_pattern, analysis_content, re.DOTALL))
+        
+        # 如果没有找到任何标准格式的依赖项，尝试其他可能的格式
+        if not dependency_matches:
+            # 尝试其他常见的依赖项格式
+            alternative_patterns = [
+                r"\d+\. [^\n]+(\n\s+[^\n]+)*",              # 序号列表: 1. xxx\n   xxx
+                r"- [^\n]+(\n\s+[^\n]+)*",                  # 项目符号列表: - xxx\n   xxx
+                r"\*\*依赖\s*\d*\*\*[^*]+(\n[^*]+)*",  # 加粗标题: **依赖**xxx
+                r"Dependency\s*\d*[:]?[^\n]+(\n\s+[^\n]+)*"  # 英文依赖: Dependency: xxx
+            ]
+            
+            for pattern in alternative_patterns:
+                alt_matches = list(re.finditer(pattern, analysis_content, re.DOTALL))
+                if alt_matches:
+                    logger.info(f"使用替代格式匹配依赖项: {pattern}")
+                    dependency_matches = alt_matches
+                    break
+            
+            # 如果还是没找到，尝试按段落分割
+            if not dependency_matches:
+                # 按段落分割文本，每个段落作为一个依赖项
+                paragraphs = re.split(r"\n\s*\n", analysis_content)
+                # 创建模拟的匹配对象
+                dependency_matches = [type('obj', (object,), {'group': lambda self, x=0: p}) for p in paragraphs if p.strip()]
+                if dependency_matches:
+                    logger.info(f"使用段落分割提取依赖项: 找到 {len(dependency_matches)} 项")
+        
+        # 如果所有方法都失败，使用整个内容作为一个依赖项
+        if not dependency_matches:
+            # 创建一个单一的模拟匹配对象
+            dummy_match = type('obj', (object,), {'group': lambda self, x=0: analysis_content})
+            dependency_matches = [dummy_match]
+            logger.warning(f"未能识别依赖项格式，使用整个内容作为单一依赖项")
+        
         
         # 用于存储已处理的依赖，避免重复
         processed_deps = set()
@@ -364,12 +417,60 @@ class CodeAnalyzerAgent(BaseAgent):
         return dependencies
     
     def _extract_property(self, text: str, property_name: str) -> Optional[str]:
-        """从文本中提取属性值"""
+        """从文本中提取属性值，支持多种格式"""
         import re
-        pattern = rf"- {property_name}: ?(.*?)(?=\n- |\n\n|\Z)"
-        match = re.search(pattern, text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
+        
+        # 尝试多种可能的属性格式
+        patterns = [
+            # 标准列表格式
+            rf"- {property_name}: ?(.*?)(?=\n- |\n\n|\Z)",
+            # 标准字典格式
+            rf'"{property_name}":\s*"(.*?)"(?=,|\n|\Z)',
+            # 带引号的键值对
+            rf"{property_name}:\s*['\"]([^'\"]*)['\"](?=,|\n|\Z)",
+            # 英文冒号格式
+            rf"{property_name}:\s*(.*?)(?=\n\w+:|\n\n|\Z)",
+            # 中文冒号格式
+            rf"{property_name}：\s*(.*?)(?=\n\w+[：:]|\n\n|\Z)",
+            # 简单字段名后跟内容
+            rf"{property_name}\s*[：:，,]?\s*(.*?)(?=\n\w+[：:，,]?\s+|\n\n|\Z)",
+            # 目标/源/类型关键词后面的内容
+            rf"(?:\n|^)\s*{property_name}\b[^\n]*?(\S[^\n]*)(?=\n|\Z)"
+        ]
+        
+        # 尝试所有模式匹配
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+            if match:
+                result = match.group(1).strip()
+                # 如果结果过长，可能是错误匹配，跳过
+                if len(result) > 100:
+                    continue
+                return result
+        
+        # 尝试在整个文本中查找特定的关键词
+        if property_name == "目标":
+            # 尝试寻找可能的导入、引用或依赖语句
+            import_patterns = [
+                r"import\s+([\w\.]+)",  # import xxx
+                r"from\s+([\w\.]+)\s+import",  # from xxx import
+                r"require\(['\"]([^'\"]+)['\"]\)",  # require('xxx')
+                r"include\(['\"]([^'\"]+)['\"]\)",  # include('xxx')
+                r"using\s+([\w\.]+)",  # using xxx
+                r"依赖\s*[：:]?\s*([\w\.]+)",  # 依赖: xxx
+                r"引用\s*[：:]?\s*([\w\.]+)",  # 引用: xxx
+                r"导入\s*[：:]?\s*([\w\.]+)"   # 导入: xxx
+            ]
+            
+            for pattern in import_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    return match.group(1).strip()
+        
+        # 如果是描述，尝试使用整个文本作为描述
+        if property_name == "描述" and len(text.strip()) <= 200:
+            return text.strip()
+            
         return None
     
     def _find_target_unit_id(self, target_name: str, source_file_path: str) -> Optional[str]:

@@ -335,11 +335,18 @@ class ReportGenerator:
                     logger.error(f"准备依赖关系图数据时出错: {e}")
                     dependency_data = ""
             
+            # 确保所有严重级别都存在，即使为空列表
+            for severity in ["critical", "high", "medium", "low", "info"]:
+                if severity not in vulns_by_severity:
+                    vulns_by_severity[severity] = []
+            
             # 统计数据
             stats = {
+                "critical_count": len(vulns_by_severity.get("critical", [])),
                 "high_count": len(vulns_by_severity.get("high", [])),
                 "medium_count": len(vulns_by_severity.get("medium", [])),
                 "low_count": len(vulns_by_severity.get("low", [])),
+                "info_count": len(vulns_by_severity.get("info", [])),
                 "file_count": scan_info.get("scanned_files", 0),
                 "total_count": len(vulnerabilities)
             }
@@ -359,26 +366,61 @@ class ReportGenerator:
                         # 将修复建议格式化为markdown，不必转义，模板中已经添加|e过滤器
                         remediation["specific_remediation"] = self._format_as_markdown(remediation["specific_remediation"])
             
-            # 准备漏洞类型数据
+            # 准备漏洞类型数据 - 增加错误处理
             vuln_types = []
             vuln_type_counts = []
-            for vuln_type, count in charts_data.get("vuln_type_counts", {}).items():
-                vuln_types.append(vuln_type)
-                vuln_type_counts.append(count)
+            # 确保数据存在并且是字典格式
+            if charts_data and isinstance(charts_data.get("vuln_type_counts", {}), dict):
+                for vuln_type, count in charts_data.get("vuln_type_counts", {}).items():
+                    vuln_types.append(vuln_type)
+                    vuln_type_counts.append(count)
             
-            # 准备复杂度数据 (假设有这些数据)
+            # 确保至少有一个数据项
+            if not vuln_types:
+                vuln_types = ["No data"]
+                vuln_type_counts = [0]
+            
+            # 准备复杂度数据 - 使用默认数据以防意外
             complexity_labels = ["低", "中", "高", "非常高"]
-            complexity_counts = [20, 15, 10, 5]  # 示例数据，实际应从分析中获取
+            complexity_counts = [0, 0, 0, 0]  # 初始化为0
             
-            # 准备常见漏洞类型数据 (取前5种最常见的漏洞类型)
-            common_vuln_types = []
-            common_vuln_counts = []
-            if vuln_types:
-                # 按数量排序
-                sorted_data = sorted(zip(vuln_types, vuln_type_counts), 
-                                   key=lambda x: x[1], reverse=True)[:5]
-                common_vuln_types = [item[0] for item in sorted_data]
-                common_vuln_counts = [item[1] for item in sorted_data]
+            # 如果有真实数据，使用实际数据
+            if charts_data and "complexity_counts" in charts_data:
+                try:
+                    complexity_counts = charts_data["complexity_counts"]
+                    # 确保长度匹配
+                    if len(complexity_counts) != len(complexity_labels):
+                        complexity_counts = complexity_counts + [0] * (len(complexity_labels) - len(complexity_counts))
+                except Exception as e:
+                    logger.warning(f"处理复杂度数据时出错: {e}")
+
+            # 准备常见漏洞类型数据 - 增加错误检查
+            try:
+                common_vuln_types = vuln_types[:5] if len(vuln_types) > 5 else vuln_types
+                common_vuln_counts = vuln_type_counts[:5] if len(vuln_type_counts) > 5 else vuln_type_counts
+            except Exception as e:
+                logger.warning(f"处理常见漏洞类型数据时出错: {e}")
+                common_vuln_types = ["No data"]
+                common_vuln_counts = [0]
+
+            # 准备时间线数据 - 使用默认数据
+            # 直接生成默认的时间线数据
+            timeline_events = []
+            scan_date = scan_info.get("scan_date", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            timeline_events.append({
+                "date": scan_date,
+                "event": "完成安全扫描",
+                "description": f"发现 {len(vulnerabilities)} 个安全问题"
+            })
+            
+            # 生成每日漏洞发现趋势数据 - 使用默认数据
+            daily_data = []
+            
+            # 确保有至少一个数据点避免错误
+            if not daily_data:
+                daily_data = [
+                    {"label": "今日", "count": 0}
+                ]
             
             # 创建时间线数据
             timeline_events = []

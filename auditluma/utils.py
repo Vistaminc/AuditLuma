@@ -370,6 +370,7 @@ def detect_provider_from_model(model_name: str) -> str:
         "baichuan": "baichuan",
         "glm-": "zhipu",
         "chatglm": "zhipu",
+        "mxbai-embed": "ollama_emd",  # Ollama的嵌入模型
     }
     
     for prefix, provider in model_prefixes.items():
@@ -384,15 +385,167 @@ def detect_provider_from_model(model_name: str) -> str:
         "yi-": "01ai",
         "claude": "anthropic",
         "llama": "meta",
+        "mxbai": "ollama_emd",  # Ollama的mxbai嵌入模型
     }
     
     for model_part, provider in special_models.items():
         if model_part in model_name:
             return provider
     
+    # 检测是否为Ollama模型
+    if any(model_part in model_name for model_part in ["llama", "mistral", "qwen", "gemma"]):
+        # 如果带有:latest之类的标签，可能是Ollama本地部署的模型
+        if ":" in model_name or model_name.endswith((".bin", ".gguf")):
+            return "ollama"
+    
     # 默认情况下返回openai
     logger.warning(f"无法检测模型 '{model_name}' 的提供商，默认使用OpenAI")
     return "openai"
+
+
+class OllamaClient:
+    """自定义Ollama客户端，模拟OpenAI客户端接口"""
+    
+    def __init__(self, model_name: str):
+        """初始化Ollama客户端"""
+        self.model_name = model_name
+        import httpx
+        
+        # 创建带有超时设置的httpx客户端
+        timeout_settings = httpx.Timeout(
+            connect=30.0,
+            read=120.0,      # 增加读取超时时间
+            write=30.0,
+            pool=15.0
+        )
+        self.http_client = httpx.AsyncClient(timeout=timeout_settings)
+        self.base_url = "http://localhost:11434/api"
+        self.chat = self.ChatCompletion(self)
+        logger.info(f"初始化Ollama客户端，模型: {model_name}, API地址: {self.base_url}")
+    
+    class ChatCompletion:
+        """模拟OpenAI的ChatCompletion类"""
+        
+        def __init__(self, parent):
+            self.parent = parent
+            # 创建 completions 属性，使其结构与OpenAI客户端一致
+            self.completions = self
+        
+        async def create(self, model=None, messages=None, temperature=0.7, max_tokens=None, **kwargs):
+            """调用Ollama聊天接口"""
+            model = model or self.parent.model_name
+            
+            # 转换OpenAI格式的消息到Ollama格式
+            try:
+                # 简化消息格式以兼容Ollama API
+                prompt = ""
+                
+                # 如果提供了消息数组，处理消息格式
+                if messages and isinstance(messages, list):
+                    for msg in messages:
+                        role = msg.get("role", "")
+                        content = msg.get("content", "")
+                        
+                        if role == "system":
+                            prompt += f"System: {content}\n\n"
+                        elif role == "user":
+                            prompt += f"User: {content}\n\n"
+                        elif role == "assistant":
+                            prompt += f"Assistant: {content}\n\n"
+                
+                # 尝试两种请求格式，兼容不同版本的Ollama API
+                # 格式1: 完整的聊天接口
+                payload_chat = {
+                    "model": model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "stream": False
+                }
+                
+                # 格式2: 使用 prompt 参数的简化接口
+                payload_completion = {
+                    "model": model,
+                    "prompt": prompt.strip(),
+                    "temperature": temperature,
+                    "stream": False
+                }
+                
+                if max_tokens:
+                    payload_chat["max_tokens"] = max_tokens
+                    payload_completion["max_tokens"] = max_tokens
+                
+                # Ollama只支持一种格式，使用自定义的完整API路径
+                try:
+                    # 构建更完整的消息格式
+                    logger.debug(f"发送请求到Ollama API: {payload_chat}")
+                    
+                    # 使用正确的Ollama API端点
+                    response = await self.parent.http_client.post(
+                        "http://localhost:11434/api/chat",  # 直接使用完整URL路径
+                        json=payload_chat,
+                        timeout=120.0
+                    )
+                    
+                    # 检查响应状态
+                    response.raise_for_status()
+                    response_data = response.json()
+                    logger.info(f"成功从 Ollama 获取响应")
+                    logger.debug(f"收到Ollama响应: {response_data}")
+                    
+                    # 转换Ollama响应为OpenAI格式
+                    return OllamaResponse(response_data)
+                    
+                except Exception as e:
+                    logger.error(f"Ollama API调用失败: {e}")
+                    # 重新抛出异常以便于高层捕获
+                    raise Exception(f"Ollama API调用失败: {e}")
+                
+            except Exception as e:
+                logger.error(f"Ollama API调用出错: {e}")
+                # 重新包装异常，以便于调用者处理
+                raise Exception(f"Connection error: {e}")
+
+
+class OllamaResponse:
+    """模拟OpenAI的响应对象"""
+    
+    class Message:
+        """消息对象类"""
+        def __init__(self, content, role="assistant"):
+            self.content = content
+            self.role = role
+    
+    class Choice:
+        """选择对象类"""
+        def __init__(self, message, finish_reason="stop", index=0):
+            self.message = message
+            self.finish_reason = finish_reason
+            self.index = index
+    
+    def __init__(self, ollama_response):
+        self.ollama_response = ollama_response
+        self.model = ollama_response.get("model", "")
+        
+        # 调试输出，查看实际的响应格式
+        logger.debug(f"Ollama原始响应: {ollama_response}")
+        
+        # 检查响应结构，适配不同的Ollama API响应格式
+        content = ""
+        if "message" in ollama_response and isinstance(ollama_response["message"], dict):
+            # 标准Ollama格式
+            content = ollama_response["message"].get("content", "")
+        elif "response" in ollama_response:
+            # 另一种Ollama响应格式
+            content = ollama_response["response"]
+        
+        # 创建消息对象
+        message = self.Message(content=content)
+        
+        # 创建选择对象
+        choice = self.Choice(message=message)
+        
+        # 设置选择列表
+        self.choices = [choice]
 
 
 def init_llm_client(model: Optional[str] = None) -> Any:
@@ -440,6 +593,11 @@ def init_llm_client(model: Optional[str] = None) -> Any:
     provider_config = Config.get_llm_provider_config(provider_name)
     base_url = provider_config.base_url
     api_key = provider_config.api_key
+    
+    # 特殊处理Ollama API
+    if provider_name == "ollama":
+        # 创建一个自定义的Ollama客户端
+        return OllamaClient(model_name)
     
     # 如果API密钥未在配置中设置，尝试从环境变量获取
     if not api_key:

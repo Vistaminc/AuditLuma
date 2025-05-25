@@ -838,7 +838,7 @@
                     <div class="card-body">
                         <div id="vulnerabilities-container">
                             <!-- 严重漏洞 -->
-            {% if vulnerabilities_by_severity.critical|length > 0 %}
+            {% if 'critical' in vulnerabilities_by_severity and vulnerabilities_by_severity.critical|length > 0 %}
                             <div class="severity-section" data-severity="critical">
                                 <h3><i class="fas fa-skull-crossbones"></i> 严重漏洞 <span class="count-badge">{{ vulnerabilities_by_severity.critical|length }}</span></h3>
             {% for vuln in vulnerabilities_by_severity.critical %}

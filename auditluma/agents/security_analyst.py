@@ -383,24 +383,88 @@ class SecurityAnalystAgent(BaseAgent):
         """解析LLM返回的安全分析结果"""
         vulnerabilities = []
         
-        # 提取<安全审计结果>标签之间的内容
+        # 首先尝试标准格式
         import re
         result_pattern = r"<安全审计结果>(.*?)</安全审计结果>"
         matches = re.search(result_pattern, analysis_text, re.DOTALL)
         
+        # 如果没有找到标准格式，尝试其他可能的格式
         if not matches:
-            logger.warning("无法从LLM响应中提取安全审计结果")
-            return vulnerabilities
-        
-        result_text = matches.group(1).strip()
+            # 尝试其他可能的结果部分格式
+            alternative_patterns = [
+                r"安全审计结果[\s\n:]*([\s\S]*?)(?=\n\n|\Z)",  # 中文标题
+                r"Security Analysis Results?[\s\n:]*([\s\S]*?)(?=\n\n|\Z)",  # 英文标题
+                r"\n*([\s\S]*?漏洞[\s\S]*?)(?=\n\n|\Z)",  # 包含“漏洞”关键词的部分
+                r"\n*([\s\S]*?vulnerability[\s\S]*?)(?=\n\n|\Z)",  # 包含“vulnerability”关键词的部分
+                r"\n*([\s\S]*?finding[\s\S]*?)(?=\n\n|\Z)"  # 包含“finding”关键词的部分
+            ]
+            
+            for pattern in alternative_patterns:
+                alt_match = re.search(pattern, analysis_text, re.IGNORECASE | re.DOTALL)
+                if alt_match:
+                    logger.info(f"使用替代格式解析安全审计结果: {pattern}")
+                    result_text = alt_match.group(1).strip()
+                    break
+            else:
+                # 如果所有替代格式都未找到匹配，使用整个文本
+                logger.warning(f"无法使用标准模式提取安全审计结果，尝试处理全部文本")
+                result_text = analysis_text.strip()
+        else:
+            # 使用标准格式提取的内容
+            result_text = matches.group(1).strip()
         
         # 检查是否未发现漏洞
         if "未发现安全漏洞" in result_text:
             return vulnerabilities
         
-        # 提取各个漏洞
+        # 尝试各种可能的漏洞项格式
+        # 首先尝试标准的标签格式
         vulnerability_pattern = r"\[漏洞\d+\](.*?)(?=\[漏洞\d+\]|\Z)"
-        vulnerability_matches = re.finditer(vulnerability_pattern, result_text, re.DOTALL)
+        vulnerability_matches = list(re.finditer(vulnerability_pattern, result_text, re.DOTALL))
+        
+        # 如果没有找到标准格式的漏洞项，尝试其他可能的格式
+        if not vulnerability_matches:
+            # 尝试其他常见的漏洞项格式
+            alternative_patterns = [
+                r"\d+\.\s+[^\n]+(\n\s+[^\n]+)*",                # 序号列表格式: 1. xxx\n   xxx
+                r"- [^\n]+(\n\s+[^\n]+)*",                      # 项目符号列表: - xxx\n   xxx
+                r"\*\*漏洞\s*\d*\*\*[^*]+(\n[^*]+)*",      # 加粗标题: **漏洞**xxx
+                r"Vulnerability\s*\d*[:]?[^\n]+(\n\s+[^\n]+)*", # 英文漏洞: Vulnerability: xxx
+                r"Finding\s*\d*[:]?[^\n]+(\n\s+[^\n]+)*"       # 英文发现: Finding: xxx
+            ]
+            
+            for pattern in alternative_patterns:
+                alt_matches = list(re.finditer(pattern, result_text, re.DOTALL))
+                if alt_matches:
+                    logger.info(f"使用替代格式匹配漏洞项: {pattern}")
+                    vulnerability_matches = alt_matches
+                    break
+            
+            # 如果还是没找到，尝试按段落分割
+            if not vulnerability_matches:
+                # 按段落分割文本，每个段落作为一个漏洞项
+                paragraphs = re.split(r"\n\s*\n", result_text)
+                # 过滤出可能是漏洞的段落（至少需要包含“漏洞”、“危险”或英文对应词汇）
+                vuln_keywords = ["漏洞", "危险", "vulnerability", "risk", "cwe", "owasp", "severity"]
+                filtered_paragraphs = [p for p in paragraphs if any(keyword.lower() in p.lower() for keyword in vuln_keywords)]
+                
+                # 创建模拟的匹配对象
+                vulnerability_matches = [type('obj', (object,), {'group': lambda self, x=0: p}) for p in filtered_paragraphs if p.strip()]
+                if vulnerability_matches:
+                    logger.info(f"使用段落分割提取漏洞项: 找到 {len(vulnerability_matches)} 项")
+        
+        # 如果所有方法都失败但有关键词显示存在漏洞，创建一个通用漏洞
+        vuln_indicators = ["漏洞", "vulnerability", "cwe-", "owasp", "injection", "xss", "csrf"]
+        if not vulnerability_matches and any(indicator.lower() in result_text.lower() for indicator in vuln_indicators):
+            # 创建一个单一的模拟匹配对象
+            dummy_match = type('obj', (object,), {'group': lambda self, x=0: result_text})
+            vulnerability_matches = [dummy_match]
+            logger.warning(f"未能识别标准漏洞格式，但发现漏洞关键词，尝试提取单一漏洞")
+        
+        # 如果没有找到任何漏洞，返回空列表
+        if not vulnerability_matches:
+            logger.info(f"未找到任何漏洞项: {code_unit.name}")
+            return vulnerabilities
         
         import uuid
         
@@ -470,21 +534,143 @@ class SecurityAnalystAgent(BaseAgent):
         return vulnerabilities
     
     def _extract_property(self, text: str, property_name: str) -> Optional[str]:
-        """从文本中提取属性值"""
+        """从文本中提取属性值，支持多种格式"""
         import re
-        pattern = rf"- {property_name}: ?(.*?)(?=\n- |\n\n|\Z)"
-        match = re.search(pattern, text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
+        
+        # 尝试多种可能的属性格式
+        patterns = [
+            # 标准列表格式
+            rf"- {property_name}: ?(.*?)(?=\n- |\n\n|\Z)",
+            # 标准字典格式
+            rf'"{property_name}":\s*"(.*?)"(?=,|\n|\Z)',
+            # 带引号的键值对
+            rf"{property_name}:\s*['\"]([^'\"]*)['\"](?=,|\n|\Z)",
+            # 英文冒号格式
+            rf"{property_name}:\s*(.*?)(?=\n\w+:|\n\n|\Z)",
+            # 中文冒号格式
+            rf"{property_name}：\s*(.*?)(?=\n\w+[：:]|\n\n|\Z)",
+            # 简单字段名后跟内容
+            rf"{property_name}\s*[：:，,]?\s*(.*?)(?=\n\w+[：:，,]?\s+|\n\n|\Z)",
+            # 字段名后面的内容
+            rf"(?:\n|^)\s*{property_name}\b[^\n]*?(\S[^\n]*)(?=\n|\Z)"
+        ]
+        
+        # 尝试所有模式匹配
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+            if match:
+                result = match.group(1).strip()
+                # 如果结果过长，可能是错误匹配，跳过
+                if len(result) > 100:
+                    continue
+                return result
+        
+        # 尝试特殊属性的匹配
+        if property_name.lower() in ["cwe", "owasp"]:
+            # 尝试找到CWE或OWASP编号
+            specific_patterns = [
+                rf"(?:CWE|cwe)[-:\s]*(\d+)",  # CWE-123 or CWE: 123
+                rf"(?:OWASP|owasp)[-:\s]*([A-Z0-9]{{2,3}}(?::\d+)?)",  # OWASP A1:2021 or OWASP-A1
+            ]
+            
+            for pattern in specific_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match and property_name.lower() == "cwe" and "cwe" in pattern.lower():
+                    return f"CWE-{match.group(1)}"
+                elif match and property_name.lower() == "owasp" and "owasp" in pattern.lower():
+                    return f"OWASP-{match.group(1)}"
+                    
+        # 如果是位置属性，尝试提取行号
+        if property_name.lower() in ["位置", "location", "line"]:
+            # 尝试找到行号信息
+            line_patterns = [
+                r"(?:line|lines|\u884c)\s*(\d+)(?:\s*-\s*(\d+))?",  # line 10 or lines 10-20
+                r"L(\d+)(?:-L?(\d+))?",  # L10 or L10-L20 or L10-20
+            ]
+            
+            for pattern in line_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    if match.group(2):  # 有范围
+                        return f"{match.group(1)}-{match.group(2)}"
+                    else:  # 单行
+                        return match.group(1)
+        
+        # 如果是严重性属性，尝试提取严重级别
+        if property_name.lower() in ["严重性", "severity"]:
+            severity_keywords = [
+                (r"\b(?:critical|\u4e25重|\u6781高)\b", "CRITICAL"),
+                (r"\b(?:high|\u9ad8)\b", "HIGH"),
+                (r"\b(?:medium|\u4e2d|\u4e2d等)\b", "MEDIUM"),
+                (r"\b(?:low|\u4f4e)\b", "LOW"),
+                (r"\b(?:info|information|\u4fe1息)\b", "INFO")
+            ]
+            
+            for pattern, level in severity_keywords:
+                if re.search(pattern, text, re.IGNORECASE):
+                    return level
+            
         return None
     
     def _extract_code_snippet(self, text: str) -> Optional[str]:
-        """从文本中提取代码片段"""
+        """从文本中提取代码片段，支持多种格式"""
         import re
-        pattern = r"```(?:\w+)?\n(.*?)```"
-        match = re.search(pattern, text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
+        
+        # 尝试不同的代码片段格式
+        code_patterns = [
+            # Markdown 代码块格式
+            r"```(?:\w+)?\n(.*?)```",
+            # 代码标签格式
+            r"<code>(.*?)</code>",
+            # 代码引用格式（单行）
+            r"`([^`\n]+)`",
+            # 自定义标签格式
+            r"<代码\s*\d*>(.*?)</代码>",
+            # 缩进代码块
+            r"(?:\n\s{4,}[^\n]+){2,}",
+            # 可能的代码关键词开头
+            r"(?:\n|^)(?:def|class|function|import|var|let|const|public|private|#include)\s+[^\n]+(?:\n\s+[^\n]+){1,}"
+        ]
+        
+        for pattern in code_patterns:
+            matches = re.finditer(pattern, text, re.DOTALL)
+            for match in matches:
+                snippet = match.group(1) if "(" in pattern else match.group(0)
+                
+                # 清理片段
+                snippet = snippet.strip()
+                
+                # 去除缩进代码块的空格前缀
+                if pattern.endswith("{2,}"):
+                    lines = snippet.split('\n')
+                    if lines:
+                        # 找出最小缩进量
+                        min_indent = min(len(line) - len(line.lstrip()) for line in lines if line.strip())
+                        # 去除统一的缩进
+                        snippet = '\n'.join(line[min_indent:] if line.strip() else line for line in lines)
+                
+                # 验证这是否真的是代码
+                code_indicators = [
+                    "=", "(", ")", "{", "}", "[", "]", ";", ":", "+", "-", "*", "/", "%",
+                    "def ", "class ", "function ", "import ", "from ", "var ", "let ", "const ",
+                    "public ", "private ", "protected ", "#include ", "return ", "if ", "for ", "while "
+                ]
+                
+                if any(indicator in snippet for indicator in code_indicators) and len(snippet) > 10:
+                    return snippet
+        
+        # 如果没有找到代码片段，尝试找到“代码”或“code”相关的段落
+        code_section_patterns = [
+            r"漏洞代码\s*[:：]?\s*([^\n]+(?:\n\s+[^\n]+){0,5})",
+            r"vulnerable\s+code\s*:?\s*([^\n]+(?:\n\s+[^\n]+){0,5})",
+            r"code\s+sample\s*:?\s*([^\n]+(?:\n\s+[^\n]+){0,5})"
+        ]
+        
+        for pattern in code_section_patterns:
+            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+        
         return None
     
     def _extract_security_issues(self, analysis: str) -> List[Dict[str, Any]]:
@@ -514,11 +700,33 @@ class SecurityAnalystAgent(BaseAgent):
         ]
         
         for pattern, issue_type in vulnerability_patterns:
-            if re.search(pattern, analysis, re.IGNORECASE):
-                # 尝试提取相关描述
-                context_pattern = rf"({pattern}.{{0,200}})"
-                context_match = re.search(context_pattern, analysis, re.IGNORECASE | re.DOTALL)
-                description = context_match.group(1) if context_match else "未提供详细描述"
+            try:
+                if re.search(pattern, analysis, re.IGNORECASE):
+                    # 尝试提取相关描述
+                    try:
+                        # 包裹模式在捕获组中
+                        context_pattern = rf"({pattern}.{{0,200}})"
+                        context_match = re.search(context_pattern, analysis, re.IGNORECASE | re.DOTALL)
+                        
+                        # 确保匹配存在且有捕获组
+                        if context_match and len(context_match.groups()) > 0:
+                            description = context_match.group(1)
+                        else:
+                            # 如果没有捕获组，直接使用匹配的整个文本
+                            original_match = re.search(pattern, analysis, re.IGNORECASE | re.DOTALL)
+                            if original_match:
+                                # 提取匹配文本及其前后一些上下文
+                                match_start = max(0, original_match.start() - 50)
+                                match_end = min(len(analysis), original_match.end() + 150)
+                                description = analysis[match_start:match_end].strip()
+                            else:
+                                description = "未提供详细描述"
+                    except Exception as e:
+                        logger.warning(f"提取漏洞描述时出错: {e}")
+                        description = f"检测到 {issue_type} 漏洞"
+            except Exception as e:
+                logger.warning(f"匹配漏洞模式时出错: {pattern}, {e}")
+                continue
                 
                 issues.append({
                     "type": issue_type,

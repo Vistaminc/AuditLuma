@@ -21,6 +21,8 @@ class LLMProvider(str, Enum):
     BAICHUAN = "baichuan"
     ZHIPU = "zhipu"        # 智谱AI
     AZURE = "azure"
+    OLLAMA = "ollama"      # Ollama本地模型
+    OLLAMA_EMD = "ollama_emd"  # Ollama本地嵌入模型
 
 
 class GlobalConfig(BaseModel):
@@ -75,6 +77,16 @@ class ZhipuConfig(LLMProviderConfig):
 class BaichuanConfig(LLMProviderConfig):
     """百度千帆专用配置"""
     base_url: str = "https://api.baichuan-ai.com/v1"
+
+
+class OllamaConfig(LLMProviderConfig):
+    """Ollama本地模型配置"""
+    base_url: str = "http://localhost:11434/api"
+
+
+class OllamaEmdConfig(LLMProviderConfig):
+    """Ollama本地嵌入模型配置"""
+    base_url: str = "http://localhost:11434/api/embeddings"
 
 
 class AgentConfig(BaseModel):
@@ -165,6 +177,8 @@ class Config:
     qwen = QwenConfig()
     zhipu = ZhipuConfig()
     baichuan = BaichuanConfig()
+    ollama = OllamaConfig()
+    ollama_emd = OllamaEmdConfig()
     agent = AgentConfig()
     tools = ToolsConfig()
     ui = UIConfig()
@@ -200,6 +214,12 @@ class Config:
         
         if "baichuan" in config_data:
             cls.baichuan = BaichuanConfig(**config_data["baichuan"])
+        
+        if "ollama" in config_data:
+            cls.ollama = OllamaConfig(**config_data["ollama"])
+        
+        if "ollama_emd" in config_data:
+            cls.ollama_emd = OllamaEmdConfig(**config_data["ollama_emd"])
         
         # 加载代理配置
         if "agent" in config_data:
@@ -250,6 +270,8 @@ class Config:
             "qwen": cls.qwen.dict(),
             "zhipu": cls.zhipu.dict(),
             "baichuan": cls.baichuan.dict(),
+            "ollama": cls.ollama.dict(),
+            "ollama_emd": cls.ollama_emd.dict(),
             "agent": cls.agent.dict(),
             "tools": cls.tools.dict(),
             "ui": cls.ui.dict(),
@@ -270,7 +292,9 @@ class Config:
             "moonshot": cls.moonshot,
             "qwen": cls.qwen,
             "zhipu": cls.zhipu,
-            "baichuan": cls.baichuan
+            "baichuan": cls.baichuan,
+            "ollama": cls.ollama,
+            "ollama_emd": cls.ollama_emd
         }
         
         if provider_name in provider_map:
