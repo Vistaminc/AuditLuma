@@ -32,6 +32,11 @@ AuditLuma是一个智能代码审计系统，它利用多个AI代理和先进的
 - [贡献](#-贡献)
 - [许可证](#-许可证)
 
+
+## 📚 相关文档
+
+- [AuditLuma 相关文档](https://iwt6omodfh0.feishu.cn/drive/folder/OwWqf7EYblaqTNdaDbtcnQcHnTt)
+
 ## 🚀 安装
 
 克隆仓库并安装依赖：
@@ -135,6 +140,7 @@ AuditLuma支持多家LLM厂商，并能根据模型名称自动检测厂商：
 | `qwen-` | 通义千问 |
 | `glm-`或`chatglm` | 智谱AI |
 | `baichuan` | 百川 |
+| `ollama-` | ollama |
 
 ## 💻 支持语言
 
