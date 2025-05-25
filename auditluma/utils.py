@@ -408,6 +408,8 @@ class OllamaClient:
     
     def __init__(self, model_name: str):
         """初始化Ollama客户端"""
+        from auditluma.config import Config
+        
         self.model_name = model_name
         import httpx
         
@@ -419,7 +421,9 @@ class OllamaClient:
             pool=15.0
         )
         self.http_client = httpx.AsyncClient(timeout=timeout_settings)
-        self.base_url = "http://localhost:11434/api"
+        
+        # 使用配置中的base_url，如果不存在则使用默认值
+        self.base_url = getattr(Config.ollama, 'base_url', 'http://localhost:11434/api')
         self.chat = self.ChatCompletion(self)
         logger.info(f"初始化Ollama客户端，模型: {model_name}, API地址: {self.base_url}")
     
