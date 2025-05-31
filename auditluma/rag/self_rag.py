@@ -135,8 +135,8 @@ class OllamaEmbedder:
         provider = provider or "ollama_emd"
         provider_config = Config.get_llm_provider_config(provider)
         
-        # 使用配置中的base_url，如果不存在则使用默认值
-        self.base_url = getattr(Config.ollama_emd, 'base_url', 'http://localhost:11434/api/embeddings')
+        # 确保使用正确的API端点，无论配置是什么
+        self.base_url = "http://localhost:11434/api/embeddings"
         
         # 初始化API客户端
         import httpx

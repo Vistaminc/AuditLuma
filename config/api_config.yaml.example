@@ -1,0 +1,61 @@
+# AuditLuma API 配置示例
+# 将此文件复制为 api_config.yaml 并根据需要修改
+
+api:
+  # API服务器配置
+  host: "0.0.0.0"  # 监听所有网络接口
+  port: 8000  # API服务端口
+  workers: 1  # 工作进程数
+  debug: false  # 是否启用调试模式
+
+  # CORS配置（跨域资源共享）
+  cors:
+    allowed_origins:  # 允许的来源域名列表
+      - "http://localhost:3000"  # 前端开发服务器
+      - "https://yourdomain.com"  # 生产环境域名
+    allow_credentials: true  # 是否允许凭证
+    allow_methods:  # 允许的HTTP方法
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+    allow_headers:  # 允许的HTTP头
+      - "Authorization"
+      - "Content-Type"
+
+  # 安全配置
+  security:
+    enable_auth: false  # 是否启用身份验证
+    api_key: ""  # API密钥，为空表示不使用API密钥认证
+    jwt_secret: ""  # JWT密钥，为空表示不使用JWT认证
+    token_expiry: 86400  # 令牌过期时间（秒）
+
+# 扫描任务配置
+scanning:
+  max_concurrent_tasks: 3  # 最大并发扫描任务数
+  task_timeout: 3600  # 任务超时时间（秒）
+  auto_cleanup_hours: 48  # 自动清理过期任务的时间（小时）
+  
+  # 默认扫描参数
+  defaults:
+    workers: 4  # 默认工作线程数
+    skip_deps: false  # 默认是否跳过依赖分析
+    skip_remediation: false  # 默认是否跳过修复建议生成
+    report_format: "html"  # 默认报告格式 (html, pdf, json)
+
+# 文件上传配置
+uploads:
+  max_file_size: 104857600  # 最大上传文件大小（字节），默认100MB
+  allowed_extensions:  # 允许上传的文件扩展名
+    - ".zip"
+    - ".tar.gz"
+    - ".tgz"
+  temp_dir: "./temp/uploads"  # 临时上传目录
+
+# 日志配置
+logging:
+  level: "info"  # 日志级别 (debug, info, warning, error, critical)
+  rotation: "10 MB"  # 日志文件轮转大小
+  retention: "7 days"  # 日志保留时间
+  log_file: "./logs/api.log"  # 日志文件路径

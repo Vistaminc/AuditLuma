@@ -32,6 +32,7 @@ class GlobalConfig(BaseModel):
     target_dir: str = "./goalfile"
     report_dir: str = "./reports"
     report_format: str = "html"
+    temp_dir: str = "./temp"  # 临时文件目录
 
 
 class LLMProviderConfig(BaseModel):
