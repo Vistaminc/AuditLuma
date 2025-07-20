@@ -171,7 +171,10 @@ class VulnerabilityResult:
     snippet: str = ""
     recommendation: str = ""
     references: List[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     
     def __post_init__(self):
         if self.references is None:
             self.references = []
+        if self.metadata is None:
+            self.metadata = {}

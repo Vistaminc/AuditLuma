@@ -11,7 +11,8 @@ from pathlib import Path
 
 from loguru import logger
 
-from auditluma.models.code import SourceFile, CodeUnit, VulnerabilityResult, SeverityLevel
+from auditluma.models.code import SourceFile, CodeUnit, VulnerabilityResult, SeverityLevel, FileType
+from auditluma.rag.self_rag import self_rag
 from .global_context_analyzer import GlobalContextAnalyzer, CrossFileFlow
 
 
@@ -38,6 +39,19 @@ class CrossFileAnalyzer:
         self.entities = global_context["entities"]
         self.cross_file_flows = global_context["cross_file_flows"]
         self.import_graph = global_context["import_graph"]
+        
+        # Self-RAG增强上下文检索
+        self.use_self_rag = True
+        try:
+            # 测试Self-RAG是否可用
+            if hasattr(self_rag, 'retrieve') and hasattr(self_rag, 'embedder') and hasattr(self_rag, 'vector_store'):
+                logger.debug("🤖 跨文件分析器启用Self-RAG增强")
+            else:
+                self.use_self_rag = False
+                logger.debug("Self-RAG不可用，跨文件分析器使用基础模式")
+        except Exception as e:
+            self.use_self_rag = False
+            logger.debug(f"Self-RAG初始化检查失败: {e}")
         
         # 定义危险函数和输入源的模式
         self.dangerous_patterns = {
@@ -100,6 +114,15 @@ class CrossFileAnalyzer:
         
         logger.info("🔍 开始跨文件漏洞检测...")
         
+        # Self-RAG增强：检索相关的安全知识
+        if self.use_self_rag:
+            try:
+                security_context = self._retrieve_security_context()
+                if security_context:
+                    logger.debug(f"🧠 Self-RAG检索到 {len(security_context)} 条相关安全知识")
+            except Exception as e:
+                logger.warning(f"Self-RAG上下文检索失败: {e}")
+        
         # 1. 检测跨文件SQL注入
         sql_vulns = self._detect_cross_file_sql_injection()
         vulnerabilities.extend(sql_vulns)
@@ -155,6 +178,15 @@ class CrossFileAnalyzer:
                                 recommendation="在SQL执行前对用户输入进行验证和转义，使用参数化查询",
                                 confidence=0.8
                             )
+                            
+                            # Self-RAG增强漏洞描述
+                            if self.use_self_rag:
+                                try:
+                                    security_context = self._retrieve_security_context()
+                                    vuln = self._enhance_vulnerability_with_context(vuln, security_context)
+                                except Exception as e:
+                                    logger.debug(f"Self-RAG增强SQL注入漏洞失败: {e}")
+                            
                             vulnerabilities.append(vuln)
         
         return vulnerabilities
@@ -328,8 +360,19 @@ class CrossFileAnalyzer:
             # 首先尝试直接从文件内容匹配（更可靠）
             if hasattr(entity, 'file_path'):
                 try:
-                    with open(entity.file_path, 'r', encoding='utf-8') as f:
-                        file_content = f.read()
+                    # 尝试多种编码方式读取文件
+                    file_content = None
+                    for encoding in ['utf-8', 'gbk', 'latin-1']:
+                        try:
+                            with open(entity.file_path, 'r', encoding=encoding) as f:
+                                file_content = f.read()
+                            break
+                        except UnicodeDecodeError:
+                            continue
+                    
+                    if file_content is None:
+                        # 如果所有编码都失败，跳过文件内容匹配
+                        raise Exception("无法解码文件")
                     
                     for pattern in patterns:
                         if re.search(pattern, file_content, re.IGNORECASE):
@@ -393,9 +436,18 @@ class CrossFileAnalyzer:
     def _check_cross_file_relationship(self, source_entity, target_entity) -> bool:
         """检查两个实体间是否有跨文件关系"""
         try:
-            # 读取目标文件内容
-            with open(target_entity.file_path, 'r', encoding='utf-8') as f:
-                target_content = f.read()
+            # 读取目标文件内容 - 尝试多种编码
+            target_content = None
+            for encoding in ['utf-8', 'gbk', 'latin-1']:
+                try:
+                    with open(target_entity.file_path, 'r', encoding=encoding) as f:
+                        target_content = f.read()
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if target_content is None:
+                return False
             
             # 检查目标文件是否导入了源文件的模块
             source_module = Path(source_entity.file_path).stem
@@ -422,8 +474,12 @@ class CrossFileAnalyzer:
     def _find_shortest_path(self, source: str, target: str) -> List[str]:
         """查找最短路径"""
         try:
+            # 检查节点是否存在
+            if not self.call_graph.has_node(source) or not self.call_graph.has_node(target):
+                return [source, target]
+            
             return nx.shortest_path(self.call_graph, source, target)
-        except nx.NetworkXNoPath:
+        except (nx.NetworkXNoPath, nx.NetworkXError):
             return [source, target]
     
     def _has_sql_protection_in_path(self, path: List[str]) -> bool:
@@ -578,3 +634,93 @@ class CrossFileAnalyzer:
             "Cross-File Path Traversal": "A01:2021"         # Broken Access Control
         }
         return owasp_mapping.get(vuln_type) 
+
+    def _retrieve_security_context(self) -> List[Dict[str, Any]]:
+        """使用Self-RAG检索相关的安全上下文
+        
+        Returns:
+            相关的安全知识文档列表
+        """
+        if not self.use_self_rag:
+            return []
+        
+        security_queries = [
+            "SQL injection vulnerability cross-file data flow",
+            "Cross-file XSS attack vector user input",
+            "Command injection vulnerability subprocess execution",
+            "Path traversal file operation security",
+            "Authorization bypass access control"
+        ]
+        
+        all_contexts = []
+        
+        for query in security_queries:
+            try:
+                # Self-RAG的retrieve是异步方法，这里我们先跳过
+                # 在实际使用中，应该在异步上下文中调用
+                logger.debug(f"跳过Self-RAG查询 '{query}' (需要异步上下文)")
+                # contexts = await self_rag.retrieve(query, k=3)
+                # all_contexts.extend(contexts)
+            except Exception as e:
+                logger.debug(f"检索查询 '{query}' 失败: {e}")
+        
+        # 去重并限制数量
+        unique_contexts = []
+        seen_ids = set()
+        
+        for context in all_contexts:
+            context_id = context.get('id', '')
+            if context_id not in seen_ids:
+                seen_ids.add(context_id)
+                unique_contexts.append(context)
+                
+            if len(unique_contexts) >= 10:  # 限制最多10个上下文
+                break
+        
+        return unique_contexts
+    
+    def _enhance_vulnerability_with_context(self, vulnerability: CrossFileVulnerability, 
+                                          security_context: List[Dict[str, Any]]) -> CrossFileVulnerability:
+        """使用Self-RAG上下文增强漏洞描述
+        
+        Args:
+            vulnerability: 原始漏洞对象
+            security_context: Self-RAG检索的安全上下文
+            
+        Returns:
+            增强后的漏洞对象
+        """
+        if not security_context or not self.use_self_rag:
+            return vulnerability
+        
+        try:
+            # 构建与漏洞类型相关的查询
+            vuln_query = f"{vulnerability.vulnerability_type} {vulnerability.source_file} {vulnerability.target_file}"
+            
+            # 检索更具体的上下文（需要异步上下文）
+            # specific_contexts = await self_rag.retrieve(vuln_query, k=2)
+            specific_contexts = []  # 暂时跳过
+            
+            if specific_contexts:
+                # 从上下文中提取相关信息来增强描述
+                enhanced_description = vulnerability.description
+                enhanced_recommendation = vulnerability.recommendation
+                
+                for context in specific_contexts:
+                    content = context.get('content', '')
+                    if 'recommendation' in content.lower() or 'solution' in content.lower():
+                        # 如果上下文包含修复建议，增强推荐
+                        enhanced_recommendation += f"\n\n基于代码库分析: {content[:200]}..."
+                    elif 'vulnerability' in content.lower() or 'security' in content.lower():
+                        # 如果上下文包含安全信息，增强描述
+                        enhanced_description += f"\n\n相关代码模式: {content[:150]}..."
+                
+                # 更新漏洞对象
+                vulnerability.description = enhanced_description
+                vulnerability.recommendation = enhanced_recommendation
+                vulnerability.confidence = min(vulnerability.confidence + 0.1, 1.0)  # 略微提高置信度
+                
+        except Exception as e:
+            logger.debug(f"使用Self-RAG增强漏洞描述失败: {e}")
+        
+        return vulnerability 

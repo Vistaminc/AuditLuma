@@ -16,6 +16,9 @@ AuditLuma是一个智能代码审计系统，它利用多个AI代理和先进的
 - 🔄 **MCP（多代理合作协议）** - 增强代理之间的协调与合作
 - 🔍 **Self-RAG技术** - 提高上下文理解和知识检索能力
 - 🛡️ **综合安全分析** - 全面检测漏洞并提出有效修复建议
+- 🌐 **跨文件安全分析** - 检测传统单文件分析无法发现的跨文件漏洞 **[NEW]**
+- 📊 **全局上下文构建** - 构建代码调用图、数据流图和依赖关系 **[NEW]**
+- 🎯 **污点分析** - 追踪用户输入在代码中的传播路径 **[NEW]**
 - 📊 **可视化功能** - 生成依赖关系图和详细安全报告
 - 🌐 **多LLM厂商支持** - 支持OpenAI、DeepSeek、MoonShot、通义千问等多家厂商
 - 🔄 **自动厂商检测** - 根据模型名称自动识别并配置正确的厂商API
@@ -73,7 +76,18 @@ pip install faiss-gpu
 基本用法：
 
 ```bash
+# 基本用法（包含跨文件分析）
 python main.py -d ./goalfile -o ./reports
+
+# 演示跨文件分析功能
+python demo_cross_file.py  # 创建演示项目
+python main.py -d [演示项目路径] -o ./reports  # 运行分析
+
+# 传统分析模式（跳过跨文件检测）
+python main.py -d ./goalfile -o ./reports --no-cross-file
+
+# AI增强的跨文件分析
+python main.py -d ./goalfile -o ./reports --enhanced-analysis
 ```
 
 ### 命令行参数
@@ -88,6 +102,8 @@ python main.py -d ./goalfile -o ./reports
 | `--no-self-rag` | 禁用Self-RAG检索 | 默认启用 |
 | `--no-deps` | 跳过依赖分析 | 默认不跳过 |
 | `--no-remediation` | 跳过生成修复建议 | 默认不跳过 |
+| `--no-cross-file` | 禁用跨文件漏洞检测 | 默认启用 |
+| `--enhanced-analysis` | 启用AI增强的跨文件分析 | 默认禁用 |
 | `--verbose` | 启用详细日志记录 | 默认禁用 |
 
 ## ⚙️ 配置

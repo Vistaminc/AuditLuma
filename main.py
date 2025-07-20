@@ -60,6 +60,10 @@ def init() -> argparse.Namespace:
                         help="跳过依赖分析")
     parser.add_argument("--no-remediation", action="store_true",
                         help="跳过生成修复建议")
+    parser.add_argument("--no-cross-file", action="store_true",
+                        help="禁用跨文件漏洞检测")
+    parser.add_argument("--enhanced-analysis", action="store_true",
+                        help="启用增强的跨文件安全分析（实验性功能）")
     parser.add_argument("--verbose", action="store_true",
                         help="启用详细日志记录")
     
@@ -86,12 +90,16 @@ def init() -> argparse.Namespace:
     logger.info(f"Self-RAG已启用：{Config.self_rag.enabled}")
     logger.info(f"依赖分析已启用：{not args.no_deps}")
     logger.info(f"修复建议已启用：{not args.no_remediation}")
+    logger.info(f"跨文件分析已启用：{not args.no_cross_file}")
+    if args.enhanced_analysis:
+        logger.info("✨ 增强跨文件分析模式已启用（实验性功能）")
     
     return args
 
 
 async def run_analysis(target_dir: str, output_dir: str, workers: int, 
-                     skip_deps: bool = False, skip_remediation: bool = False) -> Dict[str, Any]:
+                     skip_deps: bool = False, skip_remediation: bool = False,
+                     skip_cross_file: bool = False, enhanced_analysis: bool = False) -> Dict[str, Any]:
     """运行代码分析过程
     
     Args:
@@ -100,6 +108,8 @@ async def run_analysis(target_dir: str, output_dir: str, workers: int,
         workers: 工作线程数
         skip_deps: 是否跳过依赖分析
         skip_remediation: 是否跳过生成修复建议
+        skip_cross_file: 是否跳过跨文件漏洞检测
+        enhanced_analysis: 是否启用增强的跨文件分析
         
     Returns:
         包含分析结果的字典
@@ -140,8 +150,18 @@ async def run_analysis(target_dir: str, output_dir: str, workers: int,
     await orchestrator.initialize_agents()
     
     # 运行安全分析
-    logger.info("开始安全漏洞分析...")
-    vulnerabilities = await orchestrator.run_security_analysis(source_files)
+    if skip_cross_file:
+        logger.info("开始传统安全漏洞分析（跳过跨文件检测）...")
+    elif enhanced_analysis:
+        logger.info("开始增强安全漏洞分析（包含AI增强的跨文件检测）...")
+    else:
+        logger.info("开始全面安全漏洞分析（包含跨文件检测）...")
+        
+    vulnerabilities = await orchestrator.run_security_analysis(
+        source_files, 
+        skip_cross_file=skip_cross_file, 
+        enhanced_analysis=enhanced_analysis
+    )
     logger.info(f"安全分析完成：发现{len(vulnerabilities)}个潜在漏洞")
     
     # 运行代码依赖分析（如果未跳过）
@@ -247,7 +267,9 @@ async def main() -> None:
             output_dir=args.output,
             workers=args.workers,
             skip_deps=args.no_deps,
-            skip_remediation=args.no_remediation
+            skip_remediation=args.no_remediation,
+            skip_cross_file=args.no_cross_file,
+            enhanced_analysis=args.enhanced_analysis
         )
         
         # 生成报告

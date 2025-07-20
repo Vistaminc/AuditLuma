@@ -16,6 +16,16 @@ from auditluma.agents.base import BaseAgent
 from auditluma.models.code import SourceFile, CodeUnit, VulnerabilityResult
 from auditluma.rag.self_rag import self_rag
 
+# 导入分析器（延迟导入以避免循环依赖）
+try:
+    from auditluma.analyzers.global_context_analyzer import GlobalContextAnalyzer
+    from auditluma.analyzers.cross_file_analyzer import CrossFileAnalyzer
+    from auditluma.analyzers.dataflow_analyzer import DataFlowAnalyzer
+    ANALYZERS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"分析器模块不可用: {e}")
+    ANALYZERS_AVAILABLE = False
+
 
 class AgentOrchestrator:
     """管理和协调多个智能体的协调器"""
@@ -185,11 +195,15 @@ class AgentOrchestrator:
             logger.error(f"代码结构分析时出错: {e}")
             return {}
     
-    async def run_security_analysis(self, source_files: List[SourceFile]) -> List[VulnerabilityResult]:
+    async def run_security_analysis(self, source_files: List[SourceFile], 
+                                   skip_cross_file: bool = False, 
+                                   enhanced_analysis: bool = False) -> List[VulnerabilityResult]:
         """运行增强的安全漏洞分析 - 支持跨文件分析
         
         Args:
             source_files: 源文件列表
+            skip_cross_file: 是否跳过跨文件分析
+            enhanced_analysis: 是否启用AI增强的跨文件分析
             
         Returns:
             漏洞结果列表
@@ -213,9 +227,11 @@ class AgentOrchestrator:
         # 运行传统的单文件分析 + 跨文件分析
         all_vulnerabilities = []
         
-        # 1. 构建全局上下文
-        logger.info("🌐 构建全局上下文...")
-        global_context = await self._build_global_context(source_files)
+        # 1. 构建全局上下文（如果需要跨文件分析）
+        global_context = {}
+        if not skip_cross_file:
+            logger.info("🌐 构建全局上下文...")
+            global_context = await self._build_global_context(source_files)
         
         # 2. 增强的单元分析（带全局上下文）
         if Config.mcp.enabled:
@@ -225,28 +241,39 @@ class AgentOrchestrator:
         
         all_vulnerabilities.extend(enhanced_vulns)
         
-        # 3. 跨文件分析
-        cross_file_vulns = await self._run_cross_file_analysis(source_files, global_context)
-        all_vulnerabilities.extend(cross_file_vulns)
+        # 3. 跨文件分析（如果未跳过）
+        cross_file_vulns = []
+        if not skip_cross_file:
+            # 将enhanced_analysis参数传递给跨文件分析
+            cross_file_vulns = await self._run_cross_file_analysis(source_files, global_context, enhanced_analysis)
+            all_vulnerabilities.extend(cross_file_vulns)
         
-        logger.info(f"✅ 增强安全分析完成，发现 {len(all_vulnerabilities)} 个漏洞")
+        # 分析摘要
+        analysis_mode = "传统分析"
+        if not skip_cross_file:
+            analysis_mode = "AI增强跨文件分析" if enhanced_analysis else "标准跨文件分析"
+        
+        logger.info(f"✅ 安全分析完成（{analysis_mode}），发现 {len(all_vulnerabilities)} 个漏洞")
         logger.info(f"   - 单元级漏洞: {len(enhanced_vulns)}")
-        logger.info(f"   - 跨文件漏洞: {len(cross_file_vulns)}")
+        if not skip_cross_file:
+            logger.info(f"   - 跨文件漏洞: {len(cross_file_vulns)}")
         
         return all_vulnerabilities
     
     async def _build_global_context(self, source_files: List[SourceFile]) -> Dict[str, Any]:
         """构建全局上下文"""
-        try:
-            from auditluma.analyzers.global_context_analyzer import GlobalContextAnalyzer
+        if not ANALYZERS_AVAILABLE:
+            logger.warning("跨文件分析器不可用，跳过全局上下文构建")
+            return {}
             
+        try:
             context_analyzer = GlobalContextAnalyzer()
             global_context = await context_analyzer.build_global_context(source_files)
             
             return global_context
             
-        except ImportError as e:
-            logger.error(f"无法导入全局上下文分析器: {e}")
+        except Exception as e:
+            logger.error(f"构建全局上下文失败: {e}")
             return {}
         except Exception as e:
             logger.error(f"构建全局上下文时出错: {e}")
@@ -298,7 +325,7 @@ class AgentOrchestrator:
         for file_path, file_units in files_grouped.items():
             for unit in file_units:
                 task = asyncio.create_task(analyze_unit_with_context(unit, file_units))
-                tasks.append(task)
+            tasks.append(task)
         
         # 等待所有任务完成
         unit_results = await asyncio.gather(*tasks)
@@ -317,28 +344,86 @@ class AgentOrchestrator:
         # 在实际的MCP实现中，可以添加更复杂的代理协作
         return await self._run_enhanced_simplified_analysis(global_context)
     
-    async def _run_cross_file_analysis(self, source_files: List[SourceFile], global_context: Dict[str, Any]) -> List[VulnerabilityResult]:
+    async def _run_cross_file_analysis(self, source_files: List[SourceFile], 
+                                      global_context: Dict[str, Any], 
+                                      enhanced_analysis: bool = False) -> List[VulnerabilityResult]:
         """运行跨文件安全分析"""
-        security_agent = next((a for a in self.agents.values() if a.agent_type == "security_analyst"), None)
-        
-        if not security_agent:
-            logger.error("未找到安全分析智能体进行跨文件分析")
+        if not ANALYZERS_AVAILABLE:
+            logger.warning("跨文件分析器不可用，跳过跨文件分析")
+            return []
+            
+        if not global_context:
+            logger.warning("全局上下文为空，跳过跨文件分析")
             return []
         
         try:
-            task_data = {
-                "source_files": source_files,
-                "global_context": global_context
-            }
+            # 使用专门的跨文件分析器
+            cross_file_analyzer = CrossFileAnalyzer(global_context)
             
-            cross_file_vulns = await security_agent.execute_task("analyze_cross_file_security", task_data)
+            # 检测跨文件漏洞
+            cross_file_vulns = cross_file_analyzer.detect_cross_file_vulnerabilities()
             
-            logger.info(f"跨文件分析完成，发现 {len(cross_file_vulns)} 个跨文件漏洞")
-            return cross_file_vulns
+            # 转换为标准漏洞结果格式
+            vulnerability_results = cross_file_analyzer.convert_to_vulnerability_results(cross_file_vulns)
+            
+            logger.info(f"✅ 跨文件分析完成，发现 {len(vulnerability_results)} 个跨文件漏洞")
+            
+            # 如果启用了AI智能体，可以用AI进一步增强分析
+            if enhanced_analysis and Config.mcp.enabled and self.agents:
+                logger.info("🤖 使用AI智能体增强跨文件分析结果...")
+                enhanced_results = await self._enhance_cross_file_results_with_ai(
+                    vulnerability_results, global_context
+                )
+                return enhanced_results
+            
+            return vulnerability_results
             
         except Exception as e:
             logger.error(f"跨文件分析时出错: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
+    
+    async def _enhance_cross_file_results_with_ai(self, vulnerability_results: List[VulnerabilityResult], 
+                                                global_context: Dict[str, Any]) -> List[VulnerabilityResult]:
+        """使用AI智能体增强跨文件分析结果"""
+        security_agent = next((a for a in self.agents.values() if a.agent_type == "security_analyst"), None)
+        
+        if not security_agent:
+            logger.warning("未找到安全分析智能体，返回原始跨文件分析结果")
+            return vulnerability_results
+        
+        try:
+            # 为每个跨文件漏洞添加AI增强的描述和建议
+            enhanced_results = []
+            
+            for vuln_result in vulnerability_results:
+                try:
+                    # 准备AI分析的任务数据
+                    task_data = {
+                        "vulnerability": vuln_result,
+                        "global_context": global_context,
+                        "analysis_type": "enhance_cross_file_vulnerability"
+                    }
+                    
+                    # 使用AI智能体增强分析
+                    enhanced_vuln = await security_agent.execute_task("enhance_vulnerability_analysis", task_data)
+                    
+                    if enhanced_vuln:
+                        enhanced_results.append(enhanced_vuln)
+                    else:
+                        enhanced_results.append(vuln_result)  # 如果增强失败，使用原始结果
+                        
+                except Exception as e:
+                    logger.warning(f"增强漏洞分析失败: {e}，使用原始结果")
+                    enhanced_results.append(vuln_result)
+            
+            logger.info(f"AI增强完成，处理了 {len(enhanced_results)} 个跨文件漏洞")
+            return enhanced_results
+            
+        except Exception as e:
+            logger.error(f"AI增强跨文件分析结果时出错: {e}")
+            return vulnerability_results  # 返回原始结果
     
     def _build_unit_context(self, target_unit: CodeUnit, file_units: List[CodeUnit], global_context: Dict[str, Any]) -> str:
         """为代码单元构建增强上下文"""

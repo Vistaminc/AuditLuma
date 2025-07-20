@@ -14,6 +14,7 @@ from loguru import logger
 
 from auditluma.models.code import SourceFile, CodeUnit, FileType
 from auditluma.parsers.code_parser import extract_code_units
+from auditluma.rag.self_rag import self_rag
 
 
 class AnalysisLevel(Enum):
@@ -83,6 +84,15 @@ class GlobalContextAnalyzer:
             全局上下文信息字典
         """
         logger.info("🔍 开始构建全局上下文...")
+        
+        # Self-RAG增强：检索相关的代码分析知识
+        self.use_self_rag = False
+        try:
+            if hasattr(self_rag, 'retrieve') and hasattr(self_rag, 'embedder') and hasattr(self_rag, 'vector_store'):
+                self.use_self_rag = True
+                logger.debug("🤖 全局上下文分析器启用Self-RAG增强")
+        except Exception as e:
+            logger.debug(f"Self-RAG初始化检查失败: {e}")
         
         # 1. 解析所有文件，构建实体图
         await self._parse_all_files(source_files)
