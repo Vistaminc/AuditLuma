@@ -12,7 +12,7 @@ from loguru import logger
 from auditluma.config import Config
 from auditluma.agents.base import BaseAgent
 from auditluma.mcp.protocol import MessageType, MessagePriority
-from auditluma.models.code import SourceFile, CodeUnit, VulnerabilityResult, SeverityLevel
+from auditluma.models.code import SourceFile, CodeUnit, VulnerabilityResult, SeverityLevel, FileType
 from auditluma.rag.self_rag import self_rag
 
 
@@ -105,8 +105,12 @@ class SecurityAnalystAgent(BaseAgent):
         """执行任务 - 实现基类的抽象方法"""
         if task_type == "analyze_code_security":
             return await self._analyze_code_security(task_data)
+        elif task_type == "analyze_code_security_with_context":
+            return await self._analyze_code_security_with_context(task_data)
         elif task_type == "vulnerability_assessment":
             return await self._vulnerability_assessment(task_data)
+        elif task_type == "analyze_cross_file_security":
+            return await self._analyze_cross_file_security(task_data)
         else:
             raise ValueError(f"不支持的任务类型: {task_type}")
     
@@ -179,6 +183,94 @@ class SecurityAnalystAgent(BaseAgent):
         except Exception as e:
             logger.error(f"安全分析LLM调用出错: {e}")
             raise
+    
+    async def _analyze_code_security_with_context(self, data: Dict[str, Any]) -> List[VulnerabilityResult]:
+        """带全局上下文的代码安全分析"""
+        code_unit = data.get("code_unit")
+        global_context = data.get("global_context", {})
+        enhanced_context = data.get("enhanced_context", "")
+        dependency_info = data.get("dependency_info", {})
+        
+        if not code_unit:
+            raise ValueError("缺少代码单元数据")
+        
+        # 获取Self-RAG上下文
+        context_docs = await self.retrieve_context(code_unit.content)
+        context_text = "\n\n".join([doc.content for doc in context_docs])
+        
+        # 合并所有上下文信息
+        full_context = self._merge_contexts(context_text, enhanced_context, dependency_info, global_context)
+        
+        # 准备增强的安全分析提示
+        prompt = self._prepare_enhanced_security_prompt(code_unit, full_context)
+        
+        try:
+            response = await self.llm_client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": prompt["user"]}
+                ],
+                temperature=0.1
+            )
+            
+            analysis_text = response.choices[0].message.content
+            vulnerabilities = self._parse_security_analysis(analysis_text, code_unit)
+            
+            # 为每个漏洞添加上下文信息
+            for vuln in vulnerabilities:
+                vuln.metadata = vuln.metadata or {}
+                vuln.metadata["global_context_analysis"] = True
+                vuln.metadata["dependency_info"] = dependency_info
+            
+            return vulnerabilities
+            
+        except Exception as e:
+            logger.error(f"增强安全分析出错: {e}")
+            return []
+    
+    async def _analyze_cross_file_security(self, data: Dict[str, Any]) -> List[VulnerabilityResult]:
+        """跨文件安全分析"""
+        source_files = data.get("source_files", [])
+        global_context = data.get("global_context", {})
+        
+        if not source_files:
+            logger.warning("没有提供源文件进行跨文件分析")
+            return []
+        
+        # 导入分析器
+        try:
+            from auditluma.analyzers.global_context_analyzer import GlobalContextAnalyzer
+            from auditluma.analyzers.cross_file_analyzer import CrossFileAnalyzer
+            from auditluma.analyzers.dataflow_analyzer import DataFlowAnalyzer
+        except ImportError as e:
+            logger.error(f"无法导入分析器模块: {e}")
+            return []
+        
+        # 构建全局上下文（如果未提供）
+        if not global_context:
+            logger.info("构建全局上下文...")
+            context_analyzer = GlobalContextAnalyzer()
+            global_context = await context_analyzer.build_global_context(source_files)
+        
+        # 跨文件漏洞检测
+        cross_file_analyzer = CrossFileAnalyzer(global_context)
+        cross_file_vulns = cross_file_analyzer.detect_cross_file_vulnerabilities()
+        
+        # 数据流分析
+        dataflow_analyzer = DataFlowAnalyzer(global_context)
+        dangerous_flows = dataflow_analyzer.get_critical_data_flows(min_risk_score=0.6)
+        
+        # 转换为标准漏洞结果
+        vulnerability_results = cross_file_analyzer.convert_to_vulnerability_results(cross_file_vulns)
+        
+        # 添加数据流漏洞
+        flow_vulns = self._convert_dataflow_to_vulnerabilities(dangerous_flows)
+        vulnerability_results.extend(flow_vulns)
+        
+        logger.info(f"跨文件安全分析完成，发现 {len(vulnerability_results)} 个跨文件漏洞")
+        
+        return vulnerability_results
     
     async def _vulnerability_assessment(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """对整体代码库进行漏洞评估"""
@@ -378,6 +470,224 @@ class SecurityAnalystAgent(BaseAgent):
             "system": system_prompt,
             "user": user_prompt
         }
+    
+    def _prepare_enhanced_security_prompt(self, code_unit: CodeUnit, context: str) -> Dict[str, str]:
+        """准备增强的安全分析提示 - 包含全局上下文"""
+        system_prompt = """
+你是一个高级代码安全审计专家。你现在不仅看到目标代码，还看到了全局上下文信息，包括：
+- 跨文件的调用关系
+- 模块依赖关系  
+- 数据流路径
+- 相关函数的上下文
+
+请特别关注：
+1. **跨文件数据流安全**：分析数据如何在不同文件间流动
+2. **调用链安全**：检查完整的函数调用链中的安全问题
+3. **模块间接口安全**：分析模块边界的安全问题
+4. **全局状态安全**：考虑全局变量和共享状态的影响
+
+在分析时，请明确指出：
+- 是否是跨文件/跨模块的安全问题
+- 涉及的完整数据流路径
+- 需要在哪些位置添加安全检查
+
+输出格式与之前相同，但请在描述中包含跨文件分析的结果。
+
+<安全审计结果>
+[漏洞1]
+- 类型: [漏洞类型，标明是否为跨文件漏洞]
+- CWE: [对应的CWE编号]
+- OWASP: [对应的OWASP Top 10分类]
+- 严重性: [critical/high/medium/low/info]
+- 位置: [代码行号]
+- 跨文件路径: [如果是跨文件漏洞，显示数据流路径]
+- 描述: [详细描述漏洞及其风险，包含全局上下文分析]
+- 代码片段:
+```
+[相关代码片段]
+```
+- 修复建议: [如何修复这个漏洞，包含跨文件修复建议]
+
+[漏洞2]
+...
+</安全审计结果>
+
+如果没有发现漏洞，请回复:
+<安全审计结果>
+未发现安全漏洞。
+</安全审计结果>
+"""
+        
+        user_prompt = f"""
+以下是需要审计的代码单元信息：
+
+文件路径: {code_unit.source_file.path}
+单元名称: {code_unit.name}
+单元类型: {code_unit.type}
+行范围: {code_unit.start_line}-{code_unit.end_line}
+代码语言: {code_unit.source_file.file_type}
+
+代码内容:
+```
+{code_unit.content}
+```
+
+全局上下文信息:
+{context}
+
+请基于完整的全局上下文进行安全分析，特别关注跨文件的安全问题。
+"""
+        
+        return {
+            "system": system_prompt,
+            "user": user_prompt
+        }
+    
+    def _merge_contexts(self, context_text: str, enhanced_context: str, 
+                       dependency_info: Dict, global_context: Dict) -> str:
+        """合并多种上下文信息"""
+        context_parts = []
+        
+        # 1. Self-RAG上下文
+        if context_text:
+            context_parts.append(f"### Self-RAG检索上下文:\n{context_text[:1500]}")
+        
+        # 2. 增强上下文
+        if enhanced_context:
+            context_parts.append(f"### 文件级上下文:\n{enhanced_context}")
+        
+        # 3. 依赖信息
+        if dependency_info:
+            deps = []
+            for dep in dependency_info.get('dependencies', []):
+                deps.append(f"- 调用: {dep.get('name', 'unknown')} ({dep.get('type', 'unknown')})")
+            for dep in dependency_info.get('dependents', []):
+                deps.append(f"- 被调用: {dep.get('name', 'unknown')} ({dep.get('type', 'unknown')})")
+            
+            if deps:
+                context_parts.append(f"### 依赖关系:\n" + "\n".join(deps))
+        
+        # 4. 全局上下文统计
+        if global_context:
+            stats = global_context.get('statistics', {})
+            if stats:
+                context_parts.append(f"""### 全局项目信息:
+- 总代码实体: {stats.get('total_entities', 0)}
+- 总文件数: {stats.get('total_files', 0)} 
+- 调用关系: {stats.get('call_relationships', 0)}
+- 跨文件流: {stats.get('cross_file_flows', 0)}""")
+        
+        return "\n\n".join(context_parts)
+    
+    def _convert_dataflow_to_vulnerabilities(self, dangerous_flows) -> List[VulnerabilityResult]:
+        """将危险数据流转换为漏洞结果"""
+        vulnerability_results = []
+        
+        for flow in dangerous_flows:
+            # 创建虚拟的源文件和代码单元
+            from auditluma.models.code import SourceFile, CodeUnit
+            import uuid
+            from pathlib import Path
+            
+            # 获取源文件路径
+            source_entity = flow.source.entity_name
+            source_file_path = source_entity.split("::")[0] if "::" in source_entity else "unknown"
+            
+            source_file = SourceFile(
+                path=Path(source_file_path),
+                relative_path=source_file_path,
+                name=Path(source_file_path).name,
+                extension=Path(source_file_path).suffix,
+                file_type=FileType.from_extension(Path(source_file_path).suffix),
+                size=0,
+                content="# Data flow vulnerability",
+                modified_time=0
+            )
+            
+            dummy_unit = CodeUnit(
+                id=f"dataflow_{uuid.uuid4().hex[:8]}",
+                name="data_flow_vulnerability",
+                type="data_flow",
+                source_file=source_file,
+                start_line=1,
+                end_line=1,
+                content="# Data flow vulnerability detected",
+                parent_id=None
+            )
+            
+            # 根据风险评分确定严重程度
+            if flow.risk_score >= 0.8:
+                severity = SeverityLevel.CRITICAL
+            elif flow.risk_score >= 0.6:
+                severity = SeverityLevel.HIGH
+            elif flow.risk_score >= 0.4:
+                severity = SeverityLevel.MEDIUM
+            else:
+                severity = SeverityLevel.LOW
+            
+            # 构建描述
+            description = f"危险数据流：{flow.source.source_type} -> {flow.sink.sink_type}"
+            if len(flow.path) > 2:
+                description += f"，通过 {len(flow.path)-2} 个中间节点"
+            description += f"。污点级别：{flow.taint_level.value}，风险评分：{flow.risk_score:.2f}"
+            
+            vuln_result = VulnerabilityResult(
+                id=str(uuid.uuid4()),
+                title=f"Data Flow Vulnerability: {flow.source.source_type} -> {flow.sink.sink_type}",
+                description=description,
+                code_unit=dummy_unit,
+                file_path=source_file_path,
+                start_line=1,
+                end_line=1,
+                vulnerability_type="Data Flow Vulnerability",
+                severity=severity,
+                cwe_id=self._get_dataflow_cwe_id(flow.sink.sink_type),
+                owasp_category="A03:2021",  # Injection
+                confidence=flow.risk_score,
+                snippet="# Data flow vulnerability",
+                recommendation=self._get_dataflow_recommendation(flow),
+                metadata={
+                    "data_flow": True,
+                    "source_type": flow.source.source_type,
+                    "sink_type": flow.sink.sink_type,
+                    "flow_path": flow.path,
+                    "taint_level": flow.taint_level.value,
+                    "sanitization_points": flow.sanitization_points,
+                    "risk_score": flow.risk_score
+                }
+            )
+            
+            vulnerability_results.append(vuln_result)
+        
+        return vulnerability_results
+    
+    def _get_dataflow_cwe_id(self, sink_type: str) -> Optional[str]:
+        """根据汇点类型获取CWE ID"""
+        cwe_mapping = {
+            "sql_query": "CWE-89",
+            "command_exec": "CWE-78", 
+            "file_write": "CWE-22",
+            "template_render": "CWE-79",
+            "response_output": "CWE-79"
+        }
+        return cwe_mapping.get(sink_type, "CWE-20")
+    
+    def _get_dataflow_recommendation(self, flow) -> str:
+        """根据数据流生成修复建议"""
+        recommendations = {
+            "sql_query": "使用参数化查询或预处理语句，避免直接拼接用户输入到SQL语句中",
+            "command_exec": "验证和转义用户输入，使用白名单验证，避免直接执行用户提供的命令",
+            "file_write": "验证文件路径，限制可访问的目录范围，使用安全的文件操作API",
+            "template_render": "对输出进行HTML编码，使用安全的模板引擎",
+            "response_output": "对用户输入进行输出编码，防止XSS攻击"
+        }
+        
+        base_rec = recommendations.get(flow.sink.sink_type, "对用户输入进行验证和转义")
+        
+        if not flow.sanitization_points:
+            return f"{base_rec}。当前数据流路径中没有发现消毒处理。"
+        else:
+            return f"{base_rec}。已在 {', '.join(flow.sanitization_points)} 处发现部分消毒处理，请检查是否充分。"
     
     def _parse_security_analysis(self, analysis_text: str, code_unit: CodeUnit) -> List[VulnerabilityResult]:
         """解析LLM返回的安全分析结果"""

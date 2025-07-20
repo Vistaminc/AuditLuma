@@ -186,7 +186,7 @@ class AgentOrchestrator:
             return {}
     
     async def run_security_analysis(self, source_files: List[SourceFile]) -> List[VulnerabilityResult]:
-        """运行安全漏洞分析
+        """运行增强的安全漏洞分析 - 支持跨文件分析
         
         Args:
             source_files: 源文件列表
@@ -194,7 +194,7 @@ class AgentOrchestrator:
         Returns:
             漏洞结果列表
         """
-        logger.info(f"开始安全漏洞分析，分析 {len(source_files)} 个源文件")
+        logger.info(f"🔍 开始增强安全漏洞分析，分析 {len(source_files)} 个源文件")
         
         # 初始化智能体（如果尚未初始化）
         if not self.agents:
@@ -210,40 +210,95 @@ class AgentOrchestrator:
             await self._extract_code_units(source_files)
             logger.info(f"从 {len(source_files)} 个文件中提取了 {len(self.code_units)} 个代码单元")
         
-        # 在简化模式下使用安全分析智能体
-        if not Config.mcp.enabled:
-            return await self._run_simplified_analysis()
+        # 运行传统的单文件分析 + 跨文件分析
+        all_vulnerabilities = []
         
-        # 查找安全分析智能体
+        # 1. 构建全局上下文
+        logger.info("🌐 构建全局上下文...")
+        global_context = await self._build_global_context(source_files)
+        
+        # 2. 增强的单元分析（带全局上下文）
+        if Config.mcp.enabled:
+            enhanced_vulns = await self._run_enhanced_mcp_analysis(global_context)
+        else:
+            enhanced_vulns = await self._run_enhanced_simplified_analysis(global_context)
+        
+        all_vulnerabilities.extend(enhanced_vulns)
+        
+        # 3. 跨文件分析
+        cross_file_vulns = await self._run_cross_file_analysis(source_files, global_context)
+        all_vulnerabilities.extend(cross_file_vulns)
+        
+        logger.info(f"✅ 增强安全分析完成，发现 {len(all_vulnerabilities)} 个漏洞")
+        logger.info(f"   - 单元级漏洞: {len(enhanced_vulns)}")
+        logger.info(f"   - 跨文件漏洞: {len(cross_file_vulns)}")
+        
+        return all_vulnerabilities
+    
+    async def _build_global_context(self, source_files: List[SourceFile]) -> Dict[str, Any]:
+        """构建全局上下文"""
+        try:
+            from auditluma.analyzers.global_context_analyzer import GlobalContextAnalyzer
+            
+            context_analyzer = GlobalContextAnalyzer()
+            global_context = await context_analyzer.build_global_context(source_files)
+            
+            return global_context
+            
+        except ImportError as e:
+            logger.error(f"无法导入全局上下文分析器: {e}")
+            return {}
+        except Exception as e:
+            logger.error(f"构建全局上下文时出错: {e}")
+            return {}
+    
+    async def _run_enhanced_simplified_analysis(self, global_context: Dict[str, Any]) -> List[VulnerabilityResult]:
+        """运行增强的简化分析（单代理模式）"""
         security_agent = next((a for a in self.agents.values() if a.agent_type == "security_analyst"), None)
         
         if not security_agent:
-            logger.warning("未找到安全分析智能体，尝试初始化")
-            security_agent = await self._init_agent("security_analyst", "analyst")
-            
-        if not security_agent:
-            logger.error("无法初始化安全分析智能体")
+            logger.error("未找到安全分析智能体")
             return []
         
-        # 运行安全分析
         results = []
         tasks = []
         semaphore = asyncio.Semaphore(self.workers)
         
-        async def analyze_unit(unit):
+        # 按文件分组处理，提供更多上下文
+        files_grouped = {}
+        for unit in self.code_units:
+            file_path = str(unit.source_file.path)
+            if file_path not in files_grouped:
+                files_grouped[file_path] = []
+            files_grouped[file_path].append(unit)
+        
+        async def analyze_unit_with_context(unit, file_units):
             async with semaphore:
                 try:
-                    task_data = {"code_unit": unit}
-                    vulnerabilities = await security_agent.execute_task("analyze_code_security", task_data)
+                    # 构建增强上下文
+                    enhanced_context = self._build_unit_context(unit, file_units, global_context)
+                    
+                    # 获取依赖信息
+                    dependency_info = self._get_unit_dependency_info(unit, global_context)
+                    
+                    task_data = {
+                        "code_unit": unit,
+                        "global_context": global_context,
+                        "enhanced_context": enhanced_context,
+                        "dependency_info": dependency_info
+                    }
+                    
+                    vulnerabilities = await security_agent.execute_task("analyze_code_security_with_context", task_data)
                     return vulnerabilities
                 except Exception as e:
-                    logger.error(f"分析代码单元时出错: {unit.name}, {e}")
+                    logger.error(f"增强分析代码单元时出错: {unit.name}, {e}")
                     return []
         
-        # 为每个代码单元创建分析任务
-        for unit in self.code_units:
-            task = asyncio.create_task(analyze_unit(unit))
-            tasks.append(task)
+        # 为每个代码单元创建增强分析任务
+        for file_path, file_units in files_grouped.items():
+            for unit in file_units:
+                task = asyncio.create_task(analyze_unit_with_context(unit, file_units))
+                tasks.append(task)
         
         # 等待所有任务完成
         unit_results = await asyncio.gather(*tasks)
@@ -253,8 +308,117 @@ class AgentOrchestrator:
             if vulns:
                 results.extend(vulns)
         
-        logger.info(f"安全分析完成，发现 {len(results)} 个漏洞")
+        logger.info(f"增强单元分析完成，发现 {len(results)} 个漏洞")
         return results
+    
+    async def _run_enhanced_mcp_analysis(self, global_context: Dict[str, Any]) -> List[VulnerabilityResult]:
+        """运行增强的MCP分析（多代理模式）"""
+        # 为了简化，这里使用与简化模式相同的逻辑
+        # 在实际的MCP实现中，可以添加更复杂的代理协作
+        return await self._run_enhanced_simplified_analysis(global_context)
+    
+    async def _run_cross_file_analysis(self, source_files: List[SourceFile], global_context: Dict[str, Any]) -> List[VulnerabilityResult]:
+        """运行跨文件安全分析"""
+        security_agent = next((a for a in self.agents.values() if a.agent_type == "security_analyst"), None)
+        
+        if not security_agent:
+            logger.error("未找到安全分析智能体进行跨文件分析")
+            return []
+        
+        try:
+            task_data = {
+                "source_files": source_files,
+                "global_context": global_context
+            }
+            
+            cross_file_vulns = await security_agent.execute_task("analyze_cross_file_security", task_data)
+            
+            logger.info(f"跨文件分析完成，发现 {len(cross_file_vulns)} 个跨文件漏洞")
+            return cross_file_vulns
+            
+        except Exception as e:
+            logger.error(f"跨文件分析时出错: {e}")
+            return []
+    
+    def _build_unit_context(self, target_unit: CodeUnit, file_units: List[CodeUnit], global_context: Dict[str, Any]) -> str:
+        """为代码单元构建增强上下文"""
+        context_parts = []
+        
+        # 1. 同文件中的相关函数
+        related_units = [u for u in file_units if u.id != target_unit.id]
+        if related_units:
+            context_parts.append("=== 同文件中的相关函数 ===")
+            for unit in related_units[:3]:  # 限制数量
+                context_parts.append(f"函数 {unit.name} ({unit.type}):")
+                context_parts.append(unit.content[:200] + "...")
+        
+        # 2. 全局上下文中的实体信息
+        entities = global_context.get('entities', {})
+        entity_key = f"{target_unit.source_file.path}::{target_unit.name}"
+        
+        if entity_key in entities:
+            entity_context = global_context.get('call_graph', {})
+            if hasattr(entity_context, 'successors'):
+                try:
+                    import networkx as nx
+                    successors = list(entity_context.successors(entity_key))
+                    if successors:
+                        context_parts.append("=== 调用的函数 ===")
+                        for succ in successors[:3]:
+                            context_parts.append(f"- {succ}")
+                except Exception:
+                    pass
+        
+        # 3. 跨文件流信息
+        cross_file_flows = global_context.get('cross_file_flows', [])
+        related_flows = [
+            flow for flow in cross_file_flows 
+            if str(target_unit.source_file.path) in [flow.source_file, flow.target_file]
+        ]
+        
+        if related_flows:
+            context_parts.append("=== 相关跨文件数据流 ===")
+            for flow in related_flows[:3]:
+                context_parts.append(f"- {flow.flow_type}: {flow.source_func} → {flow.target_func} (风险: {flow.risk_level})")
+        
+        return "\n\n".join(context_parts)
+    
+    def _get_unit_dependency_info(self, unit: CodeUnit, global_context: Dict[str, Any]) -> Dict[str, Any]:
+        """获取代码单元的依赖信息"""
+        dependency_info = {
+            'dependencies': [],
+            'dependents': []
+        }
+        
+        try:
+            call_graph = global_context.get('call_graph')
+            entity_key = f"{unit.source_file.path}::{unit.name}"
+            
+            if call_graph and hasattr(call_graph, 'successors'):
+                import networkx as nx
+                
+                # 获取依赖（调用的函数）
+                successors = list(call_graph.successors(entity_key))
+                for succ in successors:
+                    dependency_info['dependencies'].append({
+                        'name': succ,
+                        'type': 'function_call',
+                        'description': f"调用函数 {succ}"
+                    })
+                
+                # 获取被依赖（被调用的函数）
+                predecessors = list(call_graph.predecessors(entity_key))
+                for pred in predecessors:
+                    dependency_info['dependents'].append({
+                        'name': pred,
+                        'type': 'function_call',
+                        'description': f"被函数 {pred} 调用"
+                    })
+                    
+        except Exception as e:
+            logger.debug(f"获取依赖信息时出错: {e}")
+        
+        return dependency_info
     
     async def generate_remediations(self, vulnerabilities: List[VulnerabilityResult]) -> Dict[str, Any]:
         """为检测到的漏洞生成修复建议
