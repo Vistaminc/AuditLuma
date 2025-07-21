@@ -256,6 +256,85 @@ def generate_dependency_visualization(dependency_graph, output_dir: str) -> Opti
     return interactive_graph_path
 
 
+def save_analysis_data(analysis_results: Dict[str, Any]) -> str:
+    """保存分析数据到history目录
+    
+    Args:
+        analysis_results: 分析结果
+        
+    Returns:
+        保存的数据文件路径
+    """
+    import json
+    from pathlib import Path
+    
+    # 生成文件名 - 包含项目名称
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # 获取项目名称并进行清理
+    project_name = analysis_results.get("scan_info", {}).get("project_name", "未知项目")
+    # 清理项目名称，移除不适合文件名的字符
+    safe_project_name = "".join(c for c in project_name if c.isalnum() or c in "._-").rstrip()
+    if not safe_project_name:
+        safe_project_name = "未知项目"
+    
+    data_filename = f"Data_{safe_project_name}_{timestamp}.txt"
+    data_path = Path("history") / data_filename
+    
+    # 确保history目录存在
+    data_path.parent.mkdir(exist_ok=True)
+    
+    # 准备要保存的数据
+    save_data = {
+        "analysis_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "scan_info": analysis_results.get("scan_info", {}),
+        "vulnerabilities_count": len(analysis_results.get("vulnerabilities", [])),
+        "vulnerabilities": [],
+        "dependency_info": {
+            "has_dependency_graph": analysis_results.get("dependency_graph") is not None,
+            "dependency_summary": "依赖关系图已生成" if analysis_results.get("dependency_graph") else "未生成依赖关系图"
+        },
+        "remediation_info": {
+            "has_remediation": analysis_results.get("remediation_data") is not None,
+            "remediation_count": analysis_results.get("remediation_data", {}).get("remediation_count", 0) if analysis_results.get("remediation_data") else 0
+        }
+    }
+    
+    # 处理漏洞数据（序列化VulnerabilityResult对象）
+    for vuln in analysis_results.get("vulnerabilities", []):
+        vuln_dict = {
+            "id": vuln.id,
+            "vulnerability_type": vuln.vulnerability_type,
+            "severity": vuln.severity,
+            "description": vuln.description,
+            "file_path": vuln.file_path,
+            "start_line": vuln.start_line,
+            "end_line": vuln.end_line,
+            "snippet": vuln.snippet,
+            "metadata": getattr(vuln, 'metadata', {}),
+            "cvss4_score": getattr(vuln, 'cvss4_score', None),
+            "cvss4_vector": getattr(vuln, 'cvss4_vector', None),
+            "cvss4_severity": getattr(vuln, 'cvss4_severity', None)
+        }
+        save_data["vulnerabilities"].append(vuln_dict)
+    
+    # 保存完整的分析结果（用于后续报告生成）
+    save_data["full_analysis_results"] = {
+        "vulnerabilities_serialized": save_data["vulnerabilities"],  # 已序列化的漏洞数据
+        "scan_info": analysis_results.get("scan_info", {}),
+        "remediation_data": analysis_results.get("remediation_data"),  # 保存修复建议数据
+        "dependency_available": analysis_results.get("dependency_graph") is not None,
+        "code_structure": analysis_results.get("code_structure", {})
+    }
+    
+    # 写入文件
+    with open(data_path, 'w', encoding='utf-8') as f:
+        json.dump(save_data, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"分析数据已保存到：{data_path}")
+    return str(data_path)
+
+
 async def main() -> None:
     """主入口点"""
     args = init()
@@ -272,18 +351,8 @@ async def main() -> None:
             enhanced_analysis=args.enhanced_analysis
         )
         
-        # 生成报告
-        report_path = generate_report(analysis_results, args.format)
-        logger.info(f"报告已生成：{report_path}")
-        
-        # 生成依赖关系可视化
-        if not args.no_deps and analysis_results.get("dependency_graph"):
-            graph_path = generate_dependency_visualization(
-                analysis_results["dependency_graph"], 
-                args.output
-            )
-            if graph_path:
-                logger.info(f"依赖关系图已生成：{graph_path}")
+        # 保存分析数据到history目录
+        data_path = save_analysis_data(analysis_results)
         
         # 打印摘要
         vulnerabilities = analysis_results.get("vulnerabilities", [])
@@ -295,7 +364,9 @@ async def main() -> None:
         for severity, count in severity_counts.items():
             logger.info(f"  {severity.upper()}：{count}")
         
-        logger.info("AuditLuma分析成功完成")
+        logger.info(f"分析完成！数据已保存到：{data_path}")
+        logger.info("请使用Web界面生成不同格式的报告")
+        logger.info("运行命令：python -m auditluma.web.report_server")
     
     except Exception as e:
         logger.error(f"分析过程中出错: {e}")

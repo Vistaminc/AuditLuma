@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuditLuma 报告生成器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #6366f1;
+            --primary-light: #a5b4fc;
+            --primary-dark: #4f46e5;
+            --secondary-color: #f8fafc;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --white: #ffffff;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            border-radius: var(--radius-xl);
+            padding: 3rem 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            color: var(--white);
+            box-shadow: var(--shadow-xl);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .header p {
+            font-size: 1.125rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        /* Controls Panel */
+        .controls-panel {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 3rem;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            background: var(--white);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .sort-select {
+            flex: 1;
+            padding: 0.75rem;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            font-size: 0.875rem;
+            background: var(--white);
+            transition: all 0.2s ease;
+        }
+
+        .sort-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .view-toggle {
+            display: flex;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        .view-btn {
+            padding: 0.75rem 1rem;
+            border: none;
+            background: var(--white);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.875rem;
+        }
+
+        .view-btn.active {
+            background: var(--primary-color);
+            color: var(--white);
+        }
+
+        .view-btn:hover:not(.active) {
+            background: var(--secondary-color);
+        }
+
+        /* Data List */
+        .data-list {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .list-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--secondary-color);
+        }
+
+        .list-header h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .list-content {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .data-item {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .data-item:last-child {
+            border-bottom: none;
+        }
+
+        .data-item:hover {
+            background: var(--secondary-color);
+        }
+
+        .data-item.selected {
+            background: rgba(99, 102, 241, 0.05);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .item-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .item-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .meta-item i {
+            color: var(--text-muted);
+        }
+
+        .vulnerability-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--primary-color);
+            color: var(--white);
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .vulnerability-badge.high {
+            background: var(--danger-color);
+        }
+
+        .vulnerability-badge.medium {
+            background: var(--warning-color);
+        }
+
+        .vulnerability-badge.low {
+            background: var(--success-color);
+        }
+
+        /* Report Generation Panel */
+        .report-panel {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            position: sticky;
+            top: 2rem;
+        }
+
+        .panel-header {
+            padding: 1.5rem;
+            background: var(--secondary-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-header h4 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-content {
+            padding: 1.5rem;
+        }
+
+        .selected-file-info {
+            background: var(--secondary-color);
+            border-radius: var(--radius-lg);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .selected-file-info.empty {
+            text-align: center;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .file-details {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .format-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .format-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            background: var(--white);
+            color: var(--text-primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        .format-btn:hover:not(:disabled) {
+            border-color: var(--primary-color);
+            background: rgba(99, 102, 241, 0.05);
+            color: var(--primary-color);
+            transform: translateY(-1px);
+        }
+
+        .format-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .format-btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .format-btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin-left: -10px;
+            margin-top: -10px;
+            border: 2px solid var(--primary-color);
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        .format-icon {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Animations */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .report-panel {
+                position: static;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header {
+                padding: 2rem 1rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .controls-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .view-toggle {
+                width: 100%;
+            }
+
+            .view-btn {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>
+                    <i class="fas fa-shield-alt"></i>
+                    AuditLuma 报告生成器
+                </h1>
+                <p>智能安全审计报告生成，支持多种格式导出</p>
+            </div>
+        </header>
+
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <div class="search-container">
+                <input type="text" 
+                       class="search-input" 
+                       id="searchInput" 
+                       placeholder="搜索项目名称、时间或漏洞信息..."
+                       autocomplete="off">
+                <i class="fas fa-search search-icon"></i>
+            </div>
+            
+            <div class="controls-row">
+                <select class="sort-select" id="sortSelect">
+                    <option value="time-desc">按时间排序 (最新)</option>
+                    <option value="time-asc">按时间排序 (最旧)</option>
+                    <option value="name-asc">按名称排序 (A-Z)</option>
+                    <option value="name-desc">按名称排序 (Z-A)</option>
+                    <option value="vuln-desc">按漏洞数排序 (高-低)</option>
+                    <option value="vuln-asc">按漏洞数排序 (低-高)</option>
+                </select>
+                
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="list">
+                        <i class="fas fa-list"></i>
+                    </button>
+                    <button class="view-btn" data-view="grid">
+                        <i class="fas fa-th-large"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Data List -->
+            <div class="data-list">
+                <div class="list-header">
+                    <h3>
+                        <i class="fas fa-database"></i>
+                        历史分析数据
+                        <span id="resultCount" style="font-size: 0.875rem; font-weight: 400; color: var(--text-muted);"></span>
+                    </h3>
+                </div>
+                <div class="list-content" id="dataList">
+                    <!-- Data items will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Report Generation Panel -->
+            <div class="report-panel">
+                <div class="panel-header">
+                    <h4>
+                        <i class="fas fa-file-export"></i>
+                        生成报告
+                    </h4>
+                </div>
+                <div class="panel-content">
+                    <div class="selected-file-info empty" id="selectedFileInfo">
+                        <i class="fas fa-mouse-pointer"></i>
+                        请选择左侧的分析数据
+                    </div>
+                    
+                    <div class="format-buttons">
+                        <button class="format-btn" id="btn-txt" disabled onclick="generateReport('txt')">
+                            <i class="fas fa-file-alt format-icon"></i>
+                            <span>TXT 报告</span>
+                        </button>
+                        <button class="format-btn" id="btn-json" disabled onclick="generateReport('json')">
+                            <i class="fas fa-code format-icon"></i>
+                            <span>JSON 报告</span>
+                        </button>
+                        <button class="format-btn" id="btn-excel" disabled onclick="generateReport('excel')">
+                            <i class="fas fa-file-excel format-icon"></i>
+                            <span>Excel 报告</span>
+                        </button>
+                        <button class="format-btn" id="btn-html" disabled onclick="generateReport('html')">
+                            <i class="fas fa-globe format-icon"></i>
+                            <span>HTML 报告</span>
+                        </button>
+                        <button class="format-btn" id="btn-word" disabled onclick="generateReport('word')">
+                            <i class="fas fa-file-word format-icon"></i>
+                            <span>Word 报告</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ReportGenerator {
+            constructor() {
+                this.allData = [];
+                this.filteredData = [];
+                this.selectedFile = null;
+                this.currentSort = 'time-desc';
+                this.currentView = 'list';
+                
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.loadData();
+            }
+
+            bindEvents() {
+                // Search input
+                document.getElementById('searchInput').addEventListener('input', (e) => {
+                    this.handleSearch(e.target.value);
+                });
+
+                // Sort select
+                document.getElementById('sortSelect').addEventListener('change', (e) => {
+                    this.currentSort = e.target.value;
+                    this.sortAndRender();
+                });
+
+                // View toggle
+                document.querySelectorAll('.view-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.toggleView(e.target.dataset.view);
+                    });
+                });
+            }
+
+            async loadData() {
+                try {
+                    const response = await fetch('/api/history');
+                    const data = await response.json();
+                    this.allData = data;
+                    this.filteredData = [...data];
+                    this.sortAndRender();
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    this.showError('加载数据失败，请刷新页面重试');
+                }
+            }
+
+            handleSearch(query) {
+                if (!query.trim()) {
+                    this.filteredData = [...this.allData];
+                } else {
+                    const searchTerm = query.toLowerCase();
+                    this.filteredData = this.allData.filter(item => 
+                        item.display_name.toLowerCase().includes(searchTerm) ||
+                        item.project_name.toLowerCase().includes(searchTerm) ||
+                        item.analysis_time.toLowerCase().includes(searchTerm) ||
+                        item.vulnerabilities_count.toString().includes(searchTerm)
+                    );
+                }
+                this.sortAndRender();
+            }
+
+            sortAndRender() {
+                this.sortData();
+                this.renderDataList();
+                this.updateResultCount();
+            }
+
+            sortData() {
+                this.filteredData.sort((a, b) => {
+                    switch (this.currentSort) {
+                        case 'time-desc':
+                            return new Date(b.analysis_time) - new Date(a.analysis_time);
+                        case 'time-asc':
+                            return new Date(a.analysis_time) - new Date(b.analysis_time);
+                        case 'name-asc':
+                            return a.display_name.localeCompare(b.display_name);
+                        case 'name-desc':
+                            return b.display_name.localeCompare(a.display_name);
+                        case 'vuln-desc':
+                            return b.vulnerabilities_count - a.vulnerabilities_count;
+                        case 'vuln-asc':
+                            return a.vulnerabilities_count - b.vulnerabilities_count;
+                        default:
+                            return 0;
+                    }
+                });
+            }
+
+            renderDataList() {
+                const container = document.getElementById('dataList');
+                
+                if (this.filteredData.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-search"></i>
+                            <p>没有找到匹配的数据</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = this.filteredData.map(item => {
+                    const vulnerabilityLevel = this.getVulnerabilityLevel(item.vulnerabilities_count);
+                    
+                    return `
+                        <div class="data-item fade-in" onclick="reportGenerator.selectFile('${item.filename}', this)" data-filename="${item.filename}">
+                            <div class="item-header">
+                                <div style="flex: 1;">
+                                    <div class="item-title">${this.escapeHtml(item.display_name)}</div>
+                                    <div class="item-meta">
+                                        <div class="meta-item">
+                                            <i class="fas fa-clock"></i>
+                                            <span>${item.analysis_time}</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <i class="fas fa-folder"></i>
+                                            <span>${this.escapeHtml(item.project_name)}</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <i class="fas fa-file"></i>
+                                            <span>${item.scanned_files || 0} 个文件</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="vulnerability-badge ${vulnerabilityLevel}">
+                                    ${item.vulnerabilities_count}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            getVulnerabilityLevel(count) {
+                if (count >= 10) return 'high';
+                if (count >= 5) return 'medium';
+                if (count > 0) return 'low';
+                return '';
+            }
+
+            updateResultCount() {
+                const countElement = document.getElementById('resultCount');
+                const total = this.allData.length;
+                const filtered = this.filteredData.length;
+                
+                if (filtered === total) {
+                    countElement.textContent = `(${total} 项)`;
+                } else {
+                    countElement.textContent = `(${filtered}/${total} 项)`;
+                }
+            }
+
+            selectFile(filename, element) {
+                // Remove previous selection
+                document.querySelectorAll('.data-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+
+                // Add selection to current item
+                element.classList.add('selected');
+
+                // Find selected file data
+                const fileData = this.allData.find(item => item.filename === filename);
+                if (!fileData) return;
+
+                this.selectedFile = filename;
+                this.updateSelectedFileInfo(fileData);
+                this.enableReportButtons();
+            }
+
+            updateSelectedFileInfo(fileData) {
+                const container = document.getElementById('selectedFileInfo');
+                container.className = 'selected-file-info';
+                container.innerHTML = `
+                    <div class="file-name">${this.escapeHtml(fileData.display_name)}</div>
+                    <div class="file-details">
+                        <div>项目: ${this.escapeHtml(fileData.project_name)}</div>
+                        <div>时间: ${fileData.analysis_time}</div>
+                        <div>漏洞: ${fileData.vulnerabilities_count} 个</div>
+                        <div>文件: ${fileData.scanned_files || 0} 个</div>
+                    </div>
+                `;
+            }
+
+            enableReportButtons() {
+                ['txt', 'json', 'excel', 'html', 'word'].forEach(format => {
+                    document.getElementById(`btn-${format}`).disabled = false;
+                });
+            }
+
+            toggleView(view) {
+                // Update button states
+                document.querySelectorAll('.view-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.view === view);
+                });
+
+                this.currentView = view;
+                // View toggle functionality can be extended here
+            }
+
+            async generateReport(format) {
+                if (!this.selectedFile) {
+                    this.showNotification('请先选择分析数据文件', 'warning');
+                    return;
+                }
+
+                const button = document.getElementById(`btn-${format}`);
+                const originalContent = button.innerHTML;
+                
+                // Show loading state
+                button.disabled = true;
+                button.classList.add('loading');
+
+                try {
+                    const response = await fetch('/api/generate-report', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            data_file: this.selectedFile,
+                            format: format
+                        })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showNotification(`报告生成成功！文件保存至: ${result.report_path}`, 'success');
+                    } else {
+                        this.showNotification(`报告生成失败: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error generating report:', error);
+                    this.showNotification('生成报告时发生错误，请重试', 'error');
+                } finally {
+                    // Restore button state
+                    button.disabled = false;
+                    button.classList.remove('loading');
+                    button.innerHTML = originalContent;
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                // Simple notification implementation
+                alert(message);
+            }
+
+            showError(message) {
+                const container = document.getElementById('dataList');
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exclamation-triangle" style="color: var(--danger-color);"></i>
+                        <p>${message}</p>
+                    </div>
+                `;
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        }
+
+        // Initialize the report generator
+        const reportGenerator = new ReportGenerator();
+
+        // Global function for onclick handlers
+        function generateReport(format) {
+            reportGenerator.generateReport(format);
+        }
+    </script>
+</body>
+</html> 

@@ -474,7 +474,16 @@ class ReportGenerator:
             
             # 生成报告文件名
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            report_filename = f"{Config.project.name}_security_report_{timestamp}.html"
+            
+            # 优先使用扫描信息中的项目名称，否则使用配置中的项目名称
+            project_name = scan_info.get("project_name", Config.project.name)
+            
+            # 清理项目名称，移除不适合文件名的字符
+            safe_project_name = "".join(c for c in project_name if c.isalnum() or c in "._-").rstrip()
+            if not safe_project_name:
+                safe_project_name = "Unknown"
+            
+            report_filename = f"{safe_project_name}_security_report_{timestamp}.html"
             report_path = self.output_dir / report_filename
             
             # 写入文件
@@ -556,7 +565,16 @@ class ReportGenerator:
             
             # 生成报告文件名
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            report_filename = f"{Config.project.name}_security_report_{timestamp}.json"
+            
+            # 优先使用扫描信息中的项目名称，否则使用配置中的项目名称
+            project_name = scan_info.get("project_name", Config.project.name)
+            
+            # 清理项目名称，移除不适合文件名的字符
+            safe_project_name = "".join(c for c in project_name if c.isalnum() or c in "._-").rstrip()
+            if not safe_project_name:
+                safe_project_name = "Unknown"
+            
+            report_filename = f"{safe_project_name}_security_report_{timestamp}.json"
             report_path = self.output_dir / report_filename
             
             # 写入文件

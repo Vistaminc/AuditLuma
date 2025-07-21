@@ -172,9 +172,30 @@ class VulnerabilityResult:
     recommendation: str = ""
     references: List[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    cvss4_score: Optional[float] = None
+    cvss4_vector: Optional[str] = None
+    cvss4_severity: Optional[str] = None
     
     def __post_init__(self):
         if self.references is None:
             self.references = []
         if self.metadata is None:
             self.metadata = {}
+    
+    def set_cvss4_assessment(self, assessment: Dict[str, Any]) -> None:
+        """设置CVSS 4.0评估结果，摒弃旧评级标准"""
+        self.cvss4_score = assessment.get("base_score")
+        self.cvss4_vector = assessment.get("vector_string")
+        self.cvss4_severity = assessment.get("severity")  # 修正字段名
+        
+        # 根据CVSS 4.0严重程度更新传统严重程度等级（完全替换旧标准）
+        if self.cvss4_severity:
+            severity_mapping = {
+                "CRITICAL": SeverityLevel.CRITICAL,
+                "HIGH": SeverityLevel.HIGH,
+                "MEDIUM": SeverityLevel.MEDIUM,
+                "LOW": SeverityLevel.LOW,
+                "NONE": SeverityLevel.INFO
+            }
+            # 强制使用CVSS 4.0评级，摒弃原有评级
+            self.severity = severity_mapping.get(self.cvss4_severity, SeverityLevel.MEDIUM)

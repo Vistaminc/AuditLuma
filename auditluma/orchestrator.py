@@ -16,6 +16,15 @@ from auditluma.agents.base import BaseAgent
 from auditluma.models.code import SourceFile, CodeUnit, VulnerabilityResult
 from auditluma.rag.self_rag import self_rag
 
+# 导入CVSS 4.0相关模块
+from auditluma.models.cvss4 import (
+    CVSS4Calculator, CVSS4Metrics,
+    AttackVector, AttackComplexity, AttackRequirements,
+    PrivilegesRequired, UserInteraction,
+    VulnerableSystemImpact, SubsequentSystemImpact,
+    SafetyImpact, AutomationImpact, RecoveryImpact
+)
+
 # 导入分析器（延迟导入以避免循环依赖）
 try:
     from auditluma.analyzers.global_context_analyzer import GlobalContextAnalyzer
@@ -38,6 +47,156 @@ class AgentOrchestrator:
         self.task_queue = asyncio.Queue()
         self.result_queue = asyncio.Queue()
         self.dependency_graph = None  # 代码依赖关系图
+        self.cvss4_assessor = self._create_cvss4_assessor()  # CVSS 4.0评估器
+    
+    def _create_cvss4_assessor(self):
+        """创建CVSS 4.0漏洞评估器"""
+        class CVSS4VulnerabilityAssessor:
+            """内嵌的CVSS 4.0漏洞评估器"""
+            
+            def __init__(self):
+                self.calculator = CVSS4Calculator()
+                self.vulnerability_patterns = self._load_vulnerability_patterns()
+            
+            def _load_vulnerability_patterns(self):
+                """加载漏洞类型与CVSS 4.0指标的映射模式"""
+                return {
+                    # SQL注入漏洞（包括跨文件）
+                    "sql injection": {
+                        "attack_vector": AttackVector.NETWORK,
+                        "attack_complexity": AttackComplexity.LOW,
+                        "attack_requirements": AttackRequirements.NONE,
+                        "privileges_required": PrivilegesRequired.NONE,
+                        "user_interaction": UserInteraction.NONE,
+                        "vulnerable_confidentiality": VulnerableSystemImpact.HIGH,
+                        "vulnerable_integrity": VulnerableSystemImpact.HIGH,
+                        "vulnerable_availability": VulnerableSystemImpact.LOW,
+                        "subsequent_confidentiality": SubsequentSystemImpact.HIGH,
+                        "subsequent_integrity": SubsequentSystemImpact.HIGH,
+                        "subsequent_availability": SubsequentSystemImpact.NONE,
+                        "automation_impact": AutomationImpact.YES
+                    },
+                    
+                    # 命令注入漏洞
+                    "command injection": {
+                        "attack_vector": AttackVector.NETWORK,
+                        "attack_complexity": AttackComplexity.LOW,
+                        "attack_requirements": AttackRequirements.NONE,
+                        "privileges_required": PrivilegesRequired.LOW,
+                        "user_interaction": UserInteraction.NONE,
+                        "vulnerable_confidentiality": VulnerableSystemImpact.HIGH,
+                        "vulnerable_integrity": VulnerableSystemImpact.HIGH,
+                        "vulnerable_availability": VulnerableSystemImpact.HIGH,
+                        "subsequent_confidentiality": SubsequentSystemImpact.HIGH,
+                        "subsequent_integrity": SubsequentSystemImpact.HIGH,
+                        "subsequent_availability": SubsequentSystemImpact.HIGH,
+                        "automation_impact": AutomationImpact.YES,
+                        "safety_impact": SafetyImpact.PRESENT
+                    },
+                    
+                    # 路径遍历漏洞
+                    "path traversal": {
+                        "attack_vector": AttackVector.NETWORK,
+                        "attack_complexity": AttackComplexity.LOW,
+                        "attack_requirements": AttackRequirements.NONE,
+                        "privileges_required": PrivilegesRequired.NONE,
+                        "user_interaction": UserInteraction.NONE,
+                        "vulnerable_confidentiality": VulnerableSystemImpact.HIGH,
+                        "vulnerable_integrity": VulnerableSystemImpact.NONE,
+                        "vulnerable_availability": VulnerableSystemImpact.NONE,
+                        "subsequent_confidentiality": SubsequentSystemImpact.LOW,
+                        "subsequent_integrity": SubsequentSystemImpact.NONE,
+                        "subsequent_availability": SubsequentSystemImpact.NONE,
+                        "automation_impact": AutomationImpact.YES
+                    },
+                    
+                    # XSS跨站脚本
+                    "xss": {
+                        "attack_vector": AttackVector.NETWORK,
+                        "attack_complexity": AttackComplexity.LOW,
+                        "attack_requirements": AttackRequirements.NONE,
+                        "privileges_required": PrivilegesRequired.NONE,
+                        "user_interaction": UserInteraction.ACTIVE,  # 修正为ACTIVE
+                        "vulnerable_confidentiality": VulnerableSystemImpact.LOW,
+                        "vulnerable_integrity": VulnerableSystemImpact.LOW,
+                        "vulnerable_availability": VulnerableSystemImpact.NONE,
+                        "subsequent_confidentiality": SubsequentSystemImpact.LOW,
+                        "subsequent_integrity": SubsequentSystemImpact.LOW,
+                        "subsequent_availability": SubsequentSystemImpact.NONE
+                    },
+                    
+                    # 权限绕过
+                    "authorization bypass": {
+                        "attack_vector": AttackVector.NETWORK,
+                        "attack_complexity": AttackComplexity.LOW,
+                        "attack_requirements": AttackRequirements.NONE,
+                        "privileges_required": PrivilegesRequired.LOW,
+                        "user_interaction": UserInteraction.NONE,
+                        "vulnerable_confidentiality": VulnerableSystemImpact.HIGH,
+                        "vulnerable_integrity": VulnerableSystemImpact.HIGH,
+                        "vulnerable_availability": VulnerableSystemImpact.NONE,
+                        "subsequent_confidentiality": SubsequentSystemImpact.HIGH,
+                        "subsequent_integrity": SubsequentSystemImpact.HIGH,
+                        "subsequent_availability": SubsequentSystemImpact.NONE
+                    }
+                }
+            
+            def assess_vulnerability(self, vulnerability: VulnerabilityResult) -> bool:
+                """为漏洞评估CVSS 4.0分数，摒弃旧评级标准"""
+                try:
+                    # 获取漏洞类型对应的CVSS指标
+                    metrics = self._get_metrics_for_vulnerability(vulnerability)
+                    
+                    if not metrics:
+                        # 使用默认评估
+                        metrics = self._default_assessment()
+                    
+                    # 生成详细评估
+                    assessment = self.calculator.generate_detailed_assessment(metrics)
+                    
+                    # 更新漏洞对象的CVSS 4.0信息（这会替换旧的severity）
+                    vulnerability.set_cvss4_assessment(assessment)
+                    
+                    logger.debug(f"CVSS 4.0评估完成: {vulnerability.vulnerability_type} -> {assessment['base_score']} ({assessment['severity']})")
+                    return True
+                    
+                except Exception as e:
+                    logger.warning(f"CVSS 4.0评估失败 {vulnerability.vulnerability_type}: {e}")
+                    return False
+            
+            def _get_metrics_for_vulnerability(self, vulnerability: VulnerabilityResult) -> Optional[CVSS4Metrics]:
+                """根据漏洞类型获取CVSS 4.0指标"""
+                vuln_type = vulnerability.vulnerability_type.lower()
+                
+                # 匹配漏洞类型
+                pattern = None
+                for key, value in self.vulnerability_patterns.items():
+                    if key in vuln_type:
+                        pattern = value
+                        break
+                
+                if not pattern:
+                    return None
+                
+                return CVSS4Metrics(**pattern)
+            
+            def _default_assessment(self) -> CVSS4Metrics:
+                """默认的中等风险评估"""
+                return CVSS4Metrics(
+                    attack_vector=AttackVector.NETWORK,
+                    attack_complexity=AttackComplexity.LOW,
+                    attack_requirements=AttackRequirements.NONE,
+                    privileges_required=PrivilegesRequired.LOW,
+                    user_interaction=UserInteraction.NONE,
+                    vulnerable_confidentiality=VulnerableSystemImpact.LOW,
+                    vulnerable_integrity=VulnerableSystemImpact.LOW,
+                    vulnerable_availability=VulnerableSystemImpact.NONE,
+                    subsequent_confidentiality=SubsequentSystemImpact.NONE,
+                    subsequent_integrity=SubsequentSystemImpact.NONE,
+                    subsequent_availability=SubsequentSystemImpact.NONE
+                )
+        
+        return CVSS4VulnerabilityAssessor()
     
     async def initialize_agents(self) -> None:
         """初始化所有需要的智能体"""
@@ -253,10 +412,26 @@ class AgentOrchestrator:
         if not skip_cross_file:
             analysis_mode = "AI增强跨文件分析" if enhanced_analysis else "标准跨文件分析"
         
+        # 4. CVSS 4.0评估 - 摒弃旧评级标准
+        logger.info("🎯 执行CVSS 4.0漏洞评估，替换传统评级标准...")
+        cvss4_assessed = 0
+        cvss4_failed = 0
+        
+        for vulnerability in all_vulnerabilities:
+            if self.cvss4_assessor.assess_vulnerability(vulnerability):
+                cvss4_assessed += 1
+            else:
+                cvss4_failed += 1
+        
+        logger.info(f"✅ CVSS 4.0评估完成，成功评估 {cvss4_assessed}/{len(all_vulnerabilities)} 个漏洞")
+        if cvss4_failed > 0:
+            logger.warning(f"   - 评估失败: {cvss4_failed} 个漏洞")
+        
         logger.info(f"✅ 安全分析完成（{analysis_mode}），发现 {len(all_vulnerabilities)} 个漏洞")
         logger.info(f"   - 单元级漏洞: {len(enhanced_vulns)}")
         if not skip_cross_file:
             logger.info(f"   - 跨文件漏洞: {len(cross_file_vulns)}")
+        logger.info(f"   - CVSS 4.0评估: {cvss4_assessed} 个成功")
         
         return all_vulnerabilities
     
