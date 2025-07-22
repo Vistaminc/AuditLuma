@@ -5,17 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AuditLuma 报告生成器</title>
-    <!-- Google Fonts - 优化字体加载 -->
+    <!-- Google Fonts 优化加载 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- 主要UI字体 - Inter (现代无衬线字体) -->
+    <!-- 主要字体：Inter - 现代无衬线字体，适合UI界面 -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- 标题字体 - Poppins (友好的无衬线字体) -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- 代码字体 - JetBrains Mono (等宽字体) -->
+    <!-- 备用字体：Roboto - Google设计系统字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- 等宽字体：JetBrains Mono - 适合代码显示 -->
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- 备用字体 - Roboto (通用无衬线字体) -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <style>
         /* Reset and Base Styles */
@@ -50,11 +48,6 @@
             --input: 214.3 31.8% 91.4%;
             --ring: 222.2 84% 4.9%;
             --radius: 0.5rem;
-
-            /* Font families */
-            --font-primary: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-            --font-heading: 'Poppins', 'Inter', 'Roboto', sans-serif;
-            --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
 
             /* Additional semantic colors matching your dashboard */
             --success: 142.1 76.2% 36.3%;
@@ -100,7 +93,7 @@
         }
 
         body {
-            font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             color: hsl(var(--foreground));
             line-height: 1.5;
@@ -108,6 +101,8 @@
             -moz-osx-font-smoothing: grayscale;
             min-height: 100vh;
             position: relative;
+            font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+            font-variant-numeric: tabular-nums;
         }
 
         /* 背景装饰 - 参考登录页面和首页 */
@@ -176,7 +171,7 @@
             text-align: center;
             letter-spacing: -0.025em;
             position: relative;
-            font-family: 'Poppins', 'Inter', 'Roboto', sans-serif;
+            font-family: 'Inter', 'Roboto', sans-serif;
         }
 
         .page-title::after {
@@ -208,6 +203,7 @@
             max-width: 600px;
             margin: 0 auto;
             font-family: 'Inter', 'Roboto', sans-serif;
+            letter-spacing: -0.01em;
         }
 
         /* Card Components - 匹配登录页面的现代卡片设计 */
@@ -247,7 +243,8 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            font-family: 'Poppins', 'Inter', 'Roboto', sans-serif;
+            font-family: 'Inter', 'Roboto', sans-serif;
+            letter-spacing: -0.015em;
         }
 
         .card-content {
@@ -271,6 +268,7 @@
             position: relative;
             overflow: hidden;
             font-family: 'Inter', 'Roboto', sans-serif;
+            letter-spacing: -0.01em;
         }
 
         .btn-primary {
@@ -357,6 +355,7 @@
             color: #475569;
             transition: all 300ms ease;
             font-family: 'Inter', 'Roboto', sans-serif;
+            font-feature-settings: 'tnum';
         }
 
         .input:focus {
@@ -1201,6 +1200,25 @@
 
         .font-semibold {
             font-weight: 600;
+        }
+
+        /* Font Utilities */
+        .font-mono {
+            font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-feature-settings: 'liga' 0, 'calt' 0;
+        }
+
+        .font-display {
+            font-family: 'Inter', 'Roboto', sans-serif;
+            font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+        }
+
+        .tracking-tight {
+            letter-spacing: -0.025em;
+        }
+
+        .tracking-normal {
+            letter-spacing: 0;
         }
 
         /* 对勾SVG样式 */
