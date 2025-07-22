@@ -302,21 +302,49 @@ def save_analysis_data(analysis_results: Dict[str, Any]) -> str:
     
     # 处理漏洞数据（序列化VulnerabilityResult对象）
     for vuln in analysis_results.get("vulnerabilities", []):
-        vuln_dict = {
-            "id": vuln.id,
-            "vulnerability_type": vuln.vulnerability_type,
-            "severity": vuln.severity,
-            "description": vuln.description,
-            "file_path": vuln.file_path,
-            "start_line": vuln.start_line,
-            "end_line": vuln.end_line,
-            "snippet": vuln.snippet,
-            "metadata": getattr(vuln, 'metadata', {}),
-            "cvss4_score": getattr(vuln, 'cvss4_score', None),
-            "cvss4_vector": getattr(vuln, 'cvss4_vector', None),
-            "cvss4_severity": getattr(vuln, 'cvss4_severity', None)
-        }
-        save_data["vulnerabilities"].append(vuln_dict)
+        try:
+            # 标准化数据类型确保一致性
+            vuln_dict = {
+                "id": str(vuln.id) if vuln.id else f"vuln_{len(save_data['vulnerabilities'])}",
+                "title": getattr(vuln, 'title', vuln.vulnerability_type or "Unknown Vulnerability"),
+                "vulnerability_type": str(vuln.vulnerability_type) if vuln.vulnerability_type else "Unknown",
+                "severity": str(vuln.severity.value) if hasattr(vuln.severity, 'value') else str(vuln.severity),
+                "description": str(vuln.description) if vuln.description else "",
+                "file_path": str(vuln.file_path) if vuln.file_path else "unknown",
+                "start_line": int(vuln.start_line) if vuln.start_line else 1,
+                "end_line": int(vuln.end_line) if vuln.end_line else 1,
+                "snippet": str(vuln.snippet) if vuln.snippet else "",
+                "metadata": dict(getattr(vuln, 'metadata', {})),
+                "cwe_id": getattr(vuln, 'cwe_id', None),
+                "owasp_category": getattr(vuln, 'owasp_category', None),
+                "confidence": float(getattr(vuln, 'confidence', 1.0)),
+                "recommendation": str(getattr(vuln, 'recommendation', "")),
+                "references": list(getattr(vuln, 'references', [])),
+                "cvss4_score": float(getattr(vuln, 'cvss4_score')) if getattr(vuln, 'cvss4_score') is not None else None,
+                "cvss4_vector": str(getattr(vuln, 'cvss4_vector', "")),
+                "cvss4_severity": str(getattr(vuln, 'cvss4_severity', ""))
+            }
+            save_data["vulnerabilities"].append(vuln_dict)
+        except Exception as e:
+            logger.error(f"序列化漏洞数据时出错: {e}")
+            logger.debug(f"问题漏洞对象: {vuln}")
+            # 添加最小化的漏洞信息以保持数据完整性
+            fallback_vuln = {
+                "id": f"error_vuln_{len(save_data['vulnerabilities'])}",
+                "title": "数据序列化错误",
+                "vulnerability_type": "Serialization Error",
+                "severity": "medium",
+                "description": f"漏洞数据序列化失败: {str(e)}",
+                "file_path": "unknown",
+                "start_line": 1,
+                "end_line": 1,
+                "snippet": "",
+                "metadata": {},
+                "cvss4_score": None,
+                "cvss4_vector": "",
+                "cvss4_severity": ""
+            }
+            save_data["vulnerabilities"].append(fallback_vuln)
     
     # 保存完整的分析结果（用于后续报告生成）
     save_data["full_analysis_results"] = {

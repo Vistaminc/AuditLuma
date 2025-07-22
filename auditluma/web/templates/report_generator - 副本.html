@@ -5,17 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AuditLuma 报告生成器</title>
-    <!-- Google Fonts - 优化字体加载 -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- 主要UI字体 - Inter (现代无衬线字体) -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- 标题字体 - Poppins (友好的无衬线字体) -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- 代码字体 - JetBrains Mono (等宽字体) -->
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- 备用字体 - Roboto (通用无衬线字体) -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <style>
         /* Reset and Base Styles */
@@ -31,7 +22,6 @@
             /* Exact color system from your Next.js app */
             --background: 0 0% 100%;
             --foreground: 222.2 84% 4.9%;
-            --themes_color: #6765f2;
             --card: 0 0% 100%;
             --card-foreground: 222.2 84% 4.9%;
             --popover: 0 0% 100%;
@@ -51,15 +41,10 @@
             --ring: 222.2 84% 4.9%;
             --radius: 0.5rem;
 
-            /* Font families */
-            --font-primary: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-            --font-heading: 'Poppins', 'Inter', 'Roboto', sans-serif;
-            --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
-
             /* Additional semantic colors matching your dashboard */
             --success: 142.1 76.2% 36.3%;
             --success-foreground: 210 40% 98%;
-            --warning: 45 100% 58%;
+            --warning: 32.5 94.6% 43.7%;
             --warning-foreground: 210 40% 98%;
             --info: 217.2 91.2% 59.8%;
             --info-foreground: 210 40% 98%;
@@ -100,7 +85,7 @@
         }
 
         body {
-            font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             color: hsl(var(--foreground));
             line-height: 1.5;
@@ -152,7 +137,7 @@
 
         /* Layout Components */
         .container {
-            max-width: 1600px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 1.5rem;
         }
@@ -162,8 +147,8 @@
         }
 
         .page-title {
-            font-size: 1.875rem;
-            font-weight: 700;
+            font-size: 2.5rem;
+            font-weight: 800;
             background: linear-gradient(135deg, #1e293b 0%, #6366f1 50%, #8b5cf6 100%);
             background-clip: text;
             -webkit-background-clip: text;
@@ -176,7 +161,6 @@
             text-align: center;
             letter-spacing: -0.025em;
             position: relative;
-            font-family: 'Poppins', 'Inter', 'Roboto', sans-serif;
         }
 
         .page-title::after {
@@ -207,7 +191,6 @@
             font-weight: 400;
             max-width: 600px;
             margin: 0 auto;
-            font-family: 'Inter', 'Roboto', sans-serif;
         }
 
         /* Card Components - 匹配登录页面的现代卡片设计 */
@@ -234,11 +217,6 @@
         .card-header {
             padding: 1.5rem;
             border-bottom: 1px solid hsl(var(--border));
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
         }
 
         .card-title {
@@ -247,7 +225,6 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            font-family: 'Poppins', 'Inter', 'Roboto', sans-serif;
         }
 
         .card-content {
@@ -270,7 +247,6 @@
             white-space: nowrap;
             position: relative;
             overflow: hidden;
-            font-family: 'Inter', 'Roboto', sans-serif;
         }
 
         .btn-primary {
@@ -347,28 +323,27 @@
         .input {
             display: flex;
             width: 100%;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             border: 2px solid #e2e8f0;
             background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(10px);
-            padding: 0.5rem 0.75rem;
+            padding: 0.75rem 1rem;
             font-size: 0.875rem;
             font-weight: 400;
-            color: #475569;
+            color: #1e293b;
             transition: all 300ms ease;
-            font-family: 'Inter', 'Roboto', sans-serif;
         }
 
         .input:focus {
             outline: none;
-            border-color: #b6abf0;
+            border-color: #6366f1;
             background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 0 0 3px rgba(182, 171, 240, 0.1);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
             transform: translateY(-1px);
         }
 
         .input:hover {
-            border-color: #b6abf0;
+            border-color: #cbd5e1;
         }
 
         .input::placeholder {
@@ -379,29 +354,28 @@
         .select {
             display: flex;
             width: 100%;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             border: 2px solid #e2e8f0;
             background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(10px);
-            padding: 0.5rem 0.75rem;
+            padding: 0.75rem 1rem;
             font-size: 0.875rem;
             font-weight: 500;
-            color: #475569;
+            color: #1e293b;
             cursor: pointer;
             transition: all 300ms ease;
-            font-family: 'Inter', 'Roboto', sans-serif;
         }
 
         .select:focus {
             outline: none;
-            border-color: #b6abf0;
+            border-color: #6366f1;
             background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 0 0 3px rgba(182, 171, 240, 0.1);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
             transform: translateY(-1px);
         }
 
         .select:hover {
-            border-color: #b6abf0;
+            border-color: #cbd5e1;
         }
 
         /* Badge Components - 匹配现代设计的徽章样式 */
@@ -439,8 +413,8 @@
         }
 
         .badge-warning {
-            background: linear-gradient(135deg, #ffcf29 0%, #f59e0b 100%);
-            color: #1e293b;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
         }
 
         .badge-outline {
@@ -473,65 +447,50 @@
             display: grid;
             grid-template-columns: 1fr 400px;
             gap: 2rem;
-            align-items: stretch;
+            align-items: start;
         }
 
         /* Controls Panel */
         .controls-panel {
             display: flex;
-            flex-direction: row;
-            gap: 0.5rem;
-            align-items: center;
-            flex-wrap: nowrap;
-            min-width: 0;
-            flex-shrink: 0;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
         }
 
         .search-container {
             position: relative;
-            flex: 1;
-            min-width: 160px;
-            max-width: 220px;
         }
 
         .search-icon {
             position: absolute;
-            left: 0.5rem;
+            left: 0.75rem;
             top: 50%;
             transform: translateY(-50%);
+            color: hsl(var(--muted-foreground));
             width: 1rem;
             height: 1rem;
-            fill: #64748b;
-            pointer-events: none;
-            z-index: 2;
-            display: block;
         }
 
         .search-input {
-            padding-left: 2.25rem;
+            padding-left: 2.5rem;
         }
 
         .controls-row {
             display: flex;
             gap: 1rem;
             align-items: center;
-            flex-shrink: 0;
         }
 
         .view-toggle {
             display: flex;
-            border: 2px solid #e2e8f0;
+            border: 1px solid hsl(var(--border));
             border-radius: var(--radius);
             overflow: hidden;
-            transition: all 300ms ease;
-        }
-
-        .view-toggle:hover {
-            border-color: #b6abf0;
         }
 
         .view-btn {
-            padding: 0.3rem;
+            padding: 0.5rem;
             border: none;
             background: transparent;
             cursor: pointer;
@@ -539,11 +498,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'Inter', 'Roboto', sans-serif;
         }
 
         .view-btn.active {
-            background-color: #6765f2;
+            background-color: hsl(var(--primary));
             color: hsl(var(--primary-foreground));
         }
 
@@ -554,18 +512,14 @@
         /* Data List */
         .data-list {
             height: fit-content;
-            display: flex;
-            flex-direction: column;
         }
 
         .list-content {
             max-height: 600px;
             overflow-y: auto;
-            flex: 1;
         }
 
-        /* List View Styles */
-        .list-content.view-list .data-item {
+        .data-item {
             padding: 1.5rem;
             border-bottom: 1px solid hsl(var(--border));
             cursor: pointer;
@@ -573,131 +527,17 @@
             position: relative;
         }
 
-        .list-content.view-list .data-item:last-child {
+        .data-item:last-child {
             border-bottom: none;
         }
 
-        .list-content.view-list .data-item:hover {
+        .data-item:hover {
             background-color: hsl(var(--muted) / 0.5);
         }
 
-        .list-content.view-list .data-item.selected {
+        .data-item.selected {
             background-color: hsl(var(--primary) / 0.1);
-            border-left: 3px solid var(--themes_color);
-        }
-
-        /* Grid View Styles */
-        .list-content.view-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1rem;
-            padding: 1rem;
-        }
-
-        .list-content.view-grid .data-item {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid hsl(var(--border));
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            cursor: pointer;
-            transition: all 200ms ease-in-out;
-            position: relative;
-            height: fit-content;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-
-        .list-content.view-grid .data-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-            border-color: var(--themes_color);
-        }
-
-        .list-content.view-grid .data-item.selected {
-            border-color: var(--themes_color);
-            box-shadow: 0 0 0 2px rgba(103, 101, 242, 0.2);
-            background: rgba(103, 101, 242, 0.05);
-        }
-
-        .list-content.view-grid .item-header {
-            flex-direction: row;
-            align-items: flex-start;
-            margin-bottom: 1rem;
-            position: relative;
-        }
-
-        .list-content.view-grid .item-title {
-            margin-bottom: 0.75rem;
-            text-align: left;
-            font-size: 1rem;
-            font-weight: 600;
-            padding-right: 3rem;
-        }
-
-        .list-content.view-grid .badge {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            font-size: 0.875rem;
-            min-width: 2rem;
-            height: 2rem;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .list-content.view-grid .item-meta {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            align-items: stretch;
-            margin-top: 0.5rem;
-        }
-
-        .list-content.view-grid .meta-item {
-            justify-content: flex-start;
-            padding: 0.375rem 0;
-            border-bottom: 1px solid hsl(var(--border) / 0.2);
-            font-size: 0.875rem;
-            color: hsl(var(--muted-foreground));
-        }
-
-        .list-content.view-grid .meta-item:last-child {
-            border-bottom: none;
-        }
-
-        .list-content.view-grid .meta-item .meta-icon {
-            width: 1rem;
-            height: 1rem;
-            margin-right: 0.5rem;
-            opacity: 0.7;
-        }
-
-        /* Grid view specific badge colors */
-        .list-content.view-grid .badge-destructive {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.9) 0%, rgba(220, 38, 38, 0.9) 100%);
-            color: white;
-            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
-        }
-
-        .list-content.view-grid .badge-warning {
-            background: linear-gradient(135deg, rgba(255, 207, 41, 0.9) 0%, rgba(245, 158, 11, 0.9) 100%);
-            color: #1e293b;
-            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
-        }
-
-        .list-content.view-grid .badge-success {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%);
-            color: white;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-        }
-
-        .list-content.view-grid .badge-secondary {
-            background: linear-gradient(135deg, rgba(241, 245, 249, 0.9) 0%, rgba(226, 232, 240, 0.9) 100%);
-            color: #475569;
-            border: 1px solid #cbd5e1;
-            box-shadow: 0 2px 8px rgba(71, 85, 105, 0.1);
+            border-left: 3px solid hsl(var(--primary));
         }
 
         .item-header {
@@ -736,8 +576,6 @@
         .report-panel {
             position: sticky;
             top: 1.5rem;
-            height: fit-content;
-            min-height: 100%;
         }
 
         .selected-file-info {
@@ -839,25 +677,6 @@
             .report-panel {
                 position: static;
             }
-
-            /* Grid view responsive adjustments */
-            .list-content.view-grid {
-                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-                gap: 0.75rem;
-                padding: 0.75rem;
-            }
-        }
-
-        @media (max-width: 1200px) {
-            .controls-panel {
-                flex-wrap: wrap;
-                gap: 0.5rem;
-            }
-
-            .search-container {
-                min-width: 150px;
-                max-width: 250px;
-            }
         }
 
         @media (max-width: 768px) {
@@ -872,22 +691,9 @@
                 text-align: center;
             }
 
-            .card-header {
+            .controls-row {
                 flex-direction: column;
                 align-items: stretch;
-            }
-
-            .controls-panel {
-                flex-direction: column;
-                gap: 1rem;
-                width: 100%;
-                flex-wrap: wrap;
-            }
-
-            .search-container {
-                min-width: auto;
-                max-width: none;
-                flex: none;
             }
 
             .view-toggle {
@@ -896,40 +702,6 @@
 
             .view-btn {
                 flex: 1;
-            }
-
-            /* Grid view mobile adjustments */
-            .list-content.view-grid {
-                grid-template-columns: 1fr;
-                gap: 0.5rem;
-                padding: 0.5rem;
-            }
-
-            .list-content.view-grid .data-item {
-                padding: 1rem;
-            }
-
-            .list-content.view-grid .item-title {
-                font-size: 0.95rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            /* Ultra small screens */
-            .list-content.view-grid .badge {
-                position: static;
-                margin: 0 0 0.5rem auto;
-                width: fit-content;
-            }
-
-            .list-content.view-grid .item-header {
-                flex-direction: column;
-                text-align: left;
-            }
-
-            .list-content.view-grid .item-title {
-                padding-right: 0;
-                margin-bottom: 0.5rem;
             }
         }
 
@@ -1202,19 +974,6 @@
         .font-semibold {
             font-weight: 600;
         }
-
-        /* 对勾SVG样式 */
-        .check-icon {
-            width: 1rem;
-            height: 1rem;
-            fill: #1fda62;
-        }
-
-        .check-icon-large {
-            width: 1.5rem;
-            height: 1.5rem;
-            fill: #1fda62;
-        }
     </style>
 </head>
 
@@ -1295,6 +1054,35 @@
             <p class="page-description">智能安全审计报告生成，支持多种格式导出</p>
         </div>
 
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <div class="search-container">
+                <i data-lucide="search" class="search-icon"></i>
+                <input type="text" class="input search-input" id="searchInput" placeholder="搜索项目名称、时间或漏洞信息..."
+                    autocomplete="off">
+            </div>
+
+            <div class="controls-row">
+                <select class="select" id="sortSelect" style="flex: 1;">
+                    <option value="time-desc">按时间排序 (最新)</option>
+                    <option value="time-asc">按时间排序 (最旧)</option>
+                    <option value="name-asc">按名称排序 (A-Z)</option>
+                    <option value="name-desc">按名称排序 (Z-A)</option>
+                    <option value="vuln-desc">按漏洞数排序 (高-低)</option>
+                    <option value="vuln-asc">按漏洞数排序 (低-高)</option>
+                </select>
+
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="list">
+                        <i data-lucide="list"></i>
+                    </button>
+                    <button class="view-btn" data-view="grid">
+                        <i data-lucide="grid-3x3"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content -->
         <div class="main-grid">
             <!-- Data List -->
@@ -1305,36 +1093,8 @@
                         历史分析数据
                         <span id="resultCount" class="text-sm text-muted font-medium"></span>
                     </h3>
-                    <!-- Controls Panel -->
-                    <div class="controls-panel">
-                        <div class="search-container">
-                            <svg class="search-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M446.112323 177.545051c137.567677 0.219798 252.612525 104.59798 266.162424 241.493333 13.562828 136.895354-78.778182 261.818182-213.617777 289.008485-134.852525 27.203232-268.386263-52.156768-308.945455-183.608889s25.018182-272.252121 151.738182-325.779394A267.235556 267.235556 0 0 1 446.112323 177.545051m0-62.060607c-182.794343 0-330.989899 148.195556-330.989899 330.989899s148.195556 330.989899 330.989899 330.989899 330.989899-148.195556 330.989899-330.989899-148.195556-330.989899-330.989899-330.989899z m431.321212 793.341415a30.849293 30.849293 0 0 1-21.94101-9.102223l-157.220202-157.220202c-11.752727-12.179394-11.584646-31.534545 0.37495-43.50707 11.972525-11.972525 31.327677-12.140606 43.494141-0.37495l157.220202 157.220202a31.036768 31.036768 0 0 1 6.723232 33.810101 31.004444 31.004444 0 0 1-28.651313 19.174142z m0 0"></path>
-                            </svg>
-                            <input type="text" class="input search-input" id="searchInput" placeholder="搜索项目名称、时间或漏洞信息..."
-                                autocomplete="off">
-                        </div>
-
-                        <select class="select" id="sortSelect" style="width: 150px; flex-shrink: 0;">
-                            <option value="time-desc">按时间排序 (最新)</option>
-                            <option value="time-asc">按时间排序 (最旧)</option>
-                            <option value="name-asc">按名称排序 (A-Z)</option>
-                            <option value="name-desc">按名称排序 (Z-A)</option>
-                            <option value="vuln-desc">按漏洞数排序 (高-低)</option>
-                            <option value="vuln-asc">按漏洞数排序 (低-高)</option>
-                        </select>
-
-                        <div class="view-toggle" style="flex-shrink: 0; width: 70px;">
-                            <button class="view-btn active" data-view="list">
-                                <i data-lucide="list"></i>
-                            </button>
-                            <button class="view-btn" data-view="grid">
-                                <i data-lucide="grid-3x3"></i>
-                            </button>
-                        </div>
-                    </div>
                 </div>
-                <div class="list-content view-list" id="dataList">
+                <div class="list-content" id="dataList">
                     <!-- Data items will be loaded here -->
                 </div>
             </div>
@@ -1505,11 +1265,6 @@
 
             renderDataList() {
                 const container = document.getElementById('dataList');
-                
-                // Ensure the container has the correct class
-                if (!container.className.includes('view-')) {
-                    container.className = `list-content view-${this.currentView}`;
-                }
 
                 if (this.filteredData.length === 0) {
                     container.innerHTML = `
@@ -1623,13 +1378,7 @@
                 });
 
                 this.currentView = view;
-                
-                // Update the list container class
-                const listContent = document.getElementById('dataList');
-                listContent.className = `list-content view-${view}`;
-                
-                // Re-render data with new view
-                this.renderDataList();
+                // View toggle functionality can be extended here
             }
 
             async generateReport(format) {
@@ -1759,7 +1508,8 @@
                     icon.innerHTML = '<div class="progress-step-spinner"></div>';
                 } else if (status === 'completed') {
                     step.classList.add('completed');
-                    icon.innerHTML = '<svg class="progress-step-check" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M403.240649 739.274524c-13.007763 0-25.292872-5.058574-34.687367-14.45307-0.722653-0.722653-0.722653-1.445307-1.445307-1.445307L191.503176 507.302752c-7.949188-9.394495-6.503881-23.847565 3.613267-31.796753 9.394495-7.949188 23.847565-6.503881 31.796754 3.613267L401.072689 693.747354c1.445307 1.445307 2.890614 1.445307 5.058574-0.722654l384.451659-409.021877c8.671842-9.394495 23.124912-9.394495 31.796753-0.722654 9.394495 8.671842 9.394495 23.124912 0.722654 31.796754l-385.174312 409.744531c-9.394495 9.394495-21.679605 14.45307-34.687368 14.45307z" fill="#1fda62"></path></svg>';
+                    icon.innerHTML = '<i data-lucide="check" class="progress-step-check"></i>';
+                    lucide.createIcons();
                 }
             }
 
@@ -1769,7 +1519,7 @@
                 const actions = document.getElementById('progressActions');
                 const downloadBtn = document.getElementById('downloadBtn');
 
-                title.innerHTML = '<svg class="check-icon-large" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M403.240649 739.274524c-13.007763 0-25.292872-5.058574-34.687367-14.45307-0.722653-0.722653-0.722653-1.445307-1.445307-1.445307L191.503176 507.302752c-7.949188-9.394495-6.503881-23.847565 3.613267-31.796753 9.394495-7.949188 23.847565-6.503881 31.796754 3.613267L401.072689 693.747354c1.445307 1.445307 2.890614 1.445307 5.058574-0.722654l384.451659-409.021877c8.671842-9.394495 23.124912-9.394495 31.796753-0.722654 9.394495 8.671842 9.394495 23.124912 0.722654 31.796754l-385.174312 409.744531c-9.394495 9.394495-21.679605 14.45307-34.687368 14.45307z" fill="#1fda62"></path></svg> 报告生成成功！';
+                title.innerHTML = '<i data-lucide="check-circle"></i> 报告生成成功！';
                 description.textContent = `${format.toUpperCase()} 格式报告已生成完成`;
 
                 actions.style.display = 'flex';

@@ -50,10 +50,95 @@ class MultiFormatReportGenerator:
         try:
             with open(data_file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+            
+            # 验证和标准化数据格式
+            data = self._validate_and_normalize_data(data)
             return data
         except Exception as e:
             logger.error(f"加载分析数据失败: {e}")
             return {}
+
+    def _validate_and_normalize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """验证和标准化数据格式"""
+        logger.debug("开始验证和标准化数据格式...")
+        
+        # 确保必要的顶级字段存在
+        if "vulnerabilities" not in data:
+            data["vulnerabilities"] = []
+        if "scan_info" not in data:
+            data["scan_info"] = {"project_name": "Unknown", "scanned_files": 0}
+        if "analysis_time" not in data:
+            data["analysis_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 标准化漏洞数据
+        normalized_vulns = []
+        for i, vuln in enumerate(data.get("vulnerabilities", [])):
+            try:
+                normalized_vuln = self._normalize_vulnerability_data(vuln, i)
+                normalized_vulns.append(normalized_vuln)
+            except Exception as e:
+                logger.warning(f"标准化第{i+1}个漏洞数据时出错: {e}")
+                # 使用默认漏洞数据
+                default_vuln = {
+                    "id": f"norm_error_{i}",
+                    "title": "数据标准化错误",
+                    "vulnerability_type": "Normalization Error",
+                    "severity": "medium",
+                    "description": f"漏洞数据标准化失败: {str(e)}",
+                    "file_path": "unknown",
+                    "start_line": 1,
+                    "end_line": 1,
+                    "snippet": "",
+                    "metadata": {},
+                    "cvss4_score": None,
+                    "cvss4_vector": "",
+                    "cvss4_severity": ""
+                }
+                normalized_vulns.append(default_vuln)
+        
+        data["vulnerabilities"] = normalized_vulns
+        data["vulnerabilities_count"] = len(normalized_vulns)
+        
+        logger.debug(f"数据标准化完成，处理了 {len(normalized_vulns)} 个漏洞")
+        return data
+
+    def _normalize_vulnerability_data(self, vuln: Dict[str, Any], index: int) -> Dict[str, Any]:
+        """标准化单个漏洞数据"""
+        return {
+            "id": str(vuln.get("id", f"vuln_{index}")),
+            "title": str(vuln.get("title", vuln.get("vulnerability_type", "Unknown Vulnerability"))),
+            "vulnerability_type": str(vuln.get("vulnerability_type", "Unknown")),
+            "severity": self._normalize_severity(vuln.get("severity", "medium")),
+            "description": str(vuln.get("description", "")),
+            "file_path": str(vuln.get("file_path", "unknown")),
+            "start_line": int(vuln.get("start_line", 1)),
+            "end_line": int(vuln.get("end_line", 1)),
+            "snippet": str(vuln.get("snippet", "")),
+            "metadata": dict(vuln.get("metadata", {})),
+            "cwe_id": vuln.get("cwe_id"),
+            "owasp_category": vuln.get("owasp_category"),
+            "confidence": float(vuln.get("confidence", 1.0)),
+            "recommendation": str(vuln.get("recommendation", "")),
+            "references": list(vuln.get("references", [])),
+            "cvss4_score": float(vuln["cvss4_score"]) if vuln.get("cvss4_score") is not None else None,
+            "cvss4_vector": str(vuln.get("cvss4_vector", "")),
+            "cvss4_severity": str(vuln.get("cvss4_severity", ""))
+        }
+
+    def _normalize_severity(self, severity_value: Any) -> str:
+        """标准化严重程度值"""
+        if isinstance(severity_value, str):
+            severity = severity_value.lower()
+            if severity in ["critical", "high", "medium", "low", "info"]:
+                return severity
+        elif hasattr(severity_value, 'value'):
+            return str(severity_value.value).lower()
+        elif hasattr(severity_value, 'name'):
+            return str(severity_value.name).lower()
+        
+        # 默认值
+        logger.warning(f"无法识别的严重程度值: {severity_value}，使用默认值 medium")
+        return "medium"
     
     def generate_filename(self, format_type: str, analysis_data: Dict[str, Any]) -> str:
         """生成报告文件名
@@ -354,85 +439,115 @@ class MultiFormatReportGenerator:
             生成的报告文件路径
         """
         from auditluma.visualizer.report_generator import ReportGenerator
-        from auditluma.models.code import VulnerabilityResult
+        from auditluma.models.code import VulnerabilityResult, SeverityLevel
         
         data = self.load_analysis_data(data_file_path)
         if not data:
             raise ValueError("无法加载分析数据")
-        
+
         # 重建VulnerabilityResult对象
         vulnerabilities = []
+        def safe_convert_severity(severity_value):
+            """安全转换严重程度值为SeverityLevel枚举"""
+            if isinstance(severity_value, SeverityLevel):
+                return severity_value
+            elif isinstance(severity_value, str):
+                try:
+                    return SeverityLevel(severity_value.lower())
+                except ValueError:
+                    logger.warning(f"未知的严重程度值: {severity_value}，使用默认值 MEDIUM")
+                    return SeverityLevel.MEDIUM
+            else:
+                logger.warning(f"无效的严重程度类型: {type(severity_value)}，使用默认值 MEDIUM")
+                return SeverityLevel.MEDIUM
+
         for vuln_data in data.get("vulnerabilities", []):
-            # 创建虚拟CodeUnit对象（用于报告生成）
-            from auditluma.models.code import CodeUnit, SourceFile, FileType
-            from pathlib import Path
+            try:
+                # 创建虚拟CodeUnit对象（用于报告生成）
+                from auditluma.models.code import CodeUnit, SourceFile, FileType
+                from pathlib import Path
+                
+                dummy_source = SourceFile(
+                    path=Path(vuln_data.get("file_path", "unknown.py")),
+                    relative_path=vuln_data.get("file_path", "unknown.py"),
+                    name=Path(vuln_data.get("file_path", "unknown.py")).name,
+                    extension=Path(vuln_data.get("file_path", "unknown.py")).suffix,
+                    file_type=FileType.PYTHON,
+                    size=100,
+                    content="# Source content not available",
+                    modified_time=0.0
+                )
             
-            dummy_source = SourceFile(
-                path=Path(vuln_data.get("file_path", "unknown.py")),
-                relative_path=vuln_data.get("file_path", "unknown.py"),
-                name=Path(vuln_data.get("file_path", "unknown.py")).name,
-                extension=Path(vuln_data.get("file_path", "unknown.py")).suffix,
-                file_type=FileType.PYTHON,
-                size=100,
-                content="# Source content not available",
-                modified_time=0.0
-            )
+                dummy_code_unit = CodeUnit(
+                    id=f"unit_{vuln_data.get('id', 'unknown')}",
+                    name="vulnerability_location",
+                    type="function",
+                    source_file=dummy_source,
+                    start_line=vuln_data.get("start_line", 1),
+                    end_line=vuln_data.get("end_line", 1),
+                    content=vuln_data.get("snippet", "# Code not available")
+                )
             
-            dummy_code_unit = CodeUnit(
-                id=f"unit_{vuln_data.get('id', 'unknown')}",
-                name="vulnerability_location",
-                type="function",
-                source_file=dummy_source,
-                start_line=vuln_data.get("start_line", 1),
-                end_line=vuln_data.get("end_line", 1),
-                content=vuln_data.get("snippet", "# Code not available")
-            )
-            
-            vuln = VulnerabilityResult(
-                id=vuln_data.get("id"),
+                vuln = VulnerabilityResult(
+                    id=vuln_data.get("id", f"vuln_{len(vulnerabilities)}"),
                 title=vuln_data.get("title", vuln_data.get("vulnerability_type", "Unknown Vulnerability")),
-                description=vuln_data.get("description"),
+                description=vuln_data.get("description", ""),
                 code_unit=dummy_code_unit,
-                file_path=vuln_data.get("file_path"),
-                start_line=vuln_data.get("start_line"),
-                end_line=vuln_data.get("end_line"),
-                vulnerability_type=vuln_data.get("vulnerability_type"),
-                severity=vuln_data.get("severity"),
+                file_path=vuln_data.get("file_path", "unknown"),
+                    start_line=int(vuln_data.get("start_line", 1)),
+                    end_line=int(vuln_data.get("end_line", 1)),
+                vulnerability_type=vuln_data.get("vulnerability_type", "Unknown"),
+                severity=safe_convert_severity(vuln_data.get("severity", "medium")),
                 snippet=vuln_data.get("snippet", "")
-            )
+                )
             
             # 添加CVSS 4.0信息
-            vuln.cvss4_score = vuln_data.get("cvss4_score")
-            vuln.cvss4_vector = vuln_data.get("cvss4_vector") 
-            vuln.cvss4_severity = vuln_data.get("cvss4_severity")
+                vuln.cvss4_score = vuln_data.get("cvss4_score")
+                vuln.cvss4_vector = vuln_data.get("cvss4_vector")
+                vuln.cvss4_severity = vuln_data.get("cvss4_severity")
             
             # 添加其他字段
-            vuln.cwe_id = vuln_data.get("cwe_id")
-            vuln.owasp_category = vuln_data.get("owasp_category")
-            vuln.confidence = vuln_data.get("confidence", 1.0)
-            vuln.recommendation = vuln_data.get("recommendation", "")
-            vuln.references = vuln_data.get("references", [])
+                vuln.cwe_id = vuln_data.get("cwe_id")
+                vuln.owasp_category = vuln_data.get("owasp_category")
+                vuln.confidence = vuln_data.get("confidence", 1.0)
+                vuln.recommendation = vuln_data.get("recommendation", "")
+                vuln.references = vuln_data.get("references", [])
             
             # 添加metadata属性
-            if hasattr(vuln, 'metadata'):
-                vuln.metadata = vuln_data.get("metadata", {})
-            vulnerabilities.append(vuln)
+                if hasattr(vuln, 'metadata'):
+                    vuln.metadata = vuln_data.get("metadata", {})
+                    vulnerabilities.append(vuln)
+            
+            except Exception as e:
+                logger.error(f"处理漏洞数据时出错: {e}")
+                logger.debug(f"问题数据: {vuln_data}")
+                # 跳过有问题的数据项，继续处理其他数据
+                continue
         
         # 获取修复建议数据
         full_results = data.get("full_analysis_results", {})
         remediation_data = full_results.get("remediation_data")
         
         # 使用现有的报告生成器
-        report_generator = ReportGenerator()
-        report_path = report_generator.generate_report(
-            vulnerabilities=vulnerabilities,
-            dependency_graph=None,  # 历史数据中不保存图对象
-            remediation_data=remediation_data,  # 包含修复建议
-            scan_info=data.get("scan_info", {})
-        )
+        try:
+            report_generator = ReportGenerator()
+            report_path = report_generator.generate_report(
+                vulnerabilities=vulnerabilities,
+                dependency_graph=None,  # 历史数据中不保存图对象
+                remediation_data=remediation_data,  # 包含修复建议
+                scan_info=data.get("scan_info", {})
+            )
+            
+            logger.info(f"HTML报告已生成: {report_path}")
+            return str(report_path)
         
-        logger.info(f"HTML报告已生成: {report_path}")
-        return str(report_path)
+        except Exception as e:
+            logger.error(f"生成HTML报告时出错: {e}")
+            logger.debug(f"漏洞数据数量: {len(vulnerabilities)}")
+            logger.debug(f"扫描信息: {data.get('scan_info', {})}")
+            
+            # 生成简化版HTML报告作为回退方案
+            return self._generate_fallback_html_report(data, str(e))
     
     def generate_word_report(self, data_file_path: str) -> str:
         """生成Word格式报告

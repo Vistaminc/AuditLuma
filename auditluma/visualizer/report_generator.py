@@ -116,10 +116,22 @@ class ReportGenerator:
         }
         
         for vuln in vulnerabilities:
-            severity = vuln.severity.lower()
-            if severity in result:
-                result[severity].append(vuln)
-            else:
+            try:
+                # 安全获取严重程度值
+                if hasattr(vuln.severity, 'value'):
+                    severity = str(vuln.severity.value).lower()
+                elif hasattr(vuln.severity, 'name'):
+                    severity = str(vuln.severity.name).lower()
+                else:
+                    severity = str(vuln.severity).lower()
+                
+                if severity in result:
+                    result[severity].append(vuln)
+                else:
+                    logger.warning(f"未知的严重程度: {severity}，归类为info")
+                    result["info"].append(vuln)
+            except Exception as e:
+                logger.error(f"处理漏洞严重程度时出错: {e}")
                 result["info"].append(vuln)
         
         return result
@@ -142,24 +154,38 @@ class ReportGenerator:
         file_counts = {}
         
         for vuln in vulnerabilities:
-            # 统计严重程度
-            severity = vuln.severity.lower()
-            if severity in severity_counts:
-                severity_counts[severity] += 1
-            else:
+            try:
+                # 统计严重程度
+                if hasattr(vuln.severity, 'value'):
+                    severity = str(vuln.severity.value).lower()
+                elif hasattr(vuln.severity, 'name'):
+                    severity = str(vuln.severity.name).lower()
+                else:
+                    severity = str(vuln.severity).lower()
+                
+                if severity in severity_counts:
+                    severity_counts[severity] += 1
+                else:
+                    severity_counts["info"] += 1
+                
+                # 统计漏洞类型
+                vuln_type = str(vuln.vulnerability_type) if vuln.vulnerability_type else "Unknown"
+                if vuln_type not in vuln_type_counts:
+                    vuln_type_counts[vuln_type] = 0
+                vuln_type_counts[vuln_type] += 1
+                
+                # 统计文件
+                file_path = str(vuln.file_path) if vuln.file_path else "unknown"
+                if file_path not in file_counts:
+                    file_counts[file_path] = 0
+                file_counts[file_path] += 1
+                
+            except Exception as e:
+                logger.error(f"处理漏洞统计数据时出错: {e}")
+                # 使用默认值继续处理
                 severity_counts["info"] += 1
-            
-            # 统计漏洞类型
-            vuln_type = vuln.vulnerability_type
-            if vuln_type not in vuln_type_counts:
-                vuln_type_counts[vuln_type] = 0
-            vuln_type_counts[vuln_type] += 1
-            
-            # 统计文件
-            file_path = vuln.file_path
-            if file_path not in file_counts:
-                file_counts[file_path] = 0
-            file_counts[file_path] += 1
+                vuln_type_counts["Unknown"] = vuln_type_counts.get("Unknown", 0) + 1
+                file_counts["unknown"] = file_counts.get("unknown", 0) + 1
         
         # 生成图表
         charts = {

@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuditLuma 报告生成器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        /* Reset and Base Styles */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            /* Color System - Matching Next.js app */
+            --background: 0 0% 100%;
+            --foreground: 222.2 84% 4.9%;
+            --card: 0 0% 100%;
+            --card-foreground: 222.2 84% 4.9%;
+            --popover: 0 0% 100%;
+            --popover-foreground: 222.2 84% 4.9%;
+            --primary: 221.2 83.2% 53.3%;
+            --primary-foreground: 210 40% 98%;
+            --secondary: 210 40% 96%;
+            --secondary-foreground: 222.2 84% 4.9%;
+            --muted: 210 40% 96%;
+            --muted-foreground: 215.4 16.3% 46.9%;
+            --accent: 210 40% 96%;
+            --accent-foreground: 222.2 84% 4.9%;
+            --destructive: 0 84.2% 60.2%;
+            --destructive-foreground: 210 40% 98%;
+            --border: 214.3 31.8% 91.4%;
+            --input: 214.3 31.8% 91.4%;
+            --ring: 221.2 83.2% 53.3%;
+            --radius: 0.5rem;
+            
+            /* Semantic Colors */
+            --success: 142.1 76.2% 36.3%;
+            --success-foreground: 355.7 100% 97.3%;
+            --warning: 32.5 94.6% 43.7%;
+            --warning-foreground: 355.7 100% 97.3%;
+            --info: 199.89 89.47% 49.8%;
+            --info-foreground: 355.7 100% 97.3%;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+        }
+
+        /* Layout Components */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 2.25rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .page-description {
+            color: hsl(var(--muted-foreground));
+            font-size: 1.125rem;
+        }
+
+        /* Card Components */
+        .card {
+            background-color: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) + 2px);
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid hsl(var(--border));
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-content {
+            padding: 1.5rem;
+        }
+
+        /* Button Components */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 150ms ease-in-out;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background-color: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+            padding: 0.5rem 1rem;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: hsl(var(--primary) / 0.9);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px hsl(var(--primary) / 0.4);
+        }
+
+        .btn-secondary {
+            background-color: hsl(var(--secondary));
+            color: hsl(var(--secondary-foreground));
+            border: 1px solid hsl(var(--border));
+            padding: 0.5rem 1rem;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: hsl(var(--secondary) / 0.8);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            color: hsl(var(--foreground));
+            border: 1px solid hsl(var(--border));
+            padding: 0.5rem 1rem;
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background-color: hsl(var(--accent));
+        }
+
+        .btn-ghost {
+            background-color: transparent;
+            color: hsl(var(--foreground));
+            padding: 0.5rem 1rem;
+        }
+
+        .btn-ghost:hover:not(:disabled) {
+            background-color: hsl(var(--accent));
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .btn-lg {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        /* Input Components */
+        .input {
+            display: flex;
+            width: 100%;
+            border-radius: var(--radius);
+            border: 1px solid hsl(var(--input));
+            background-color: hsl(var(--background));
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            transition: all 150ms ease-in-out;
+        }
+
+        .input:focus {
+            outline: none;
+            border-color: hsl(var(--ring));
+            box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+        }
+
+        .input::placeholder {
+            color: hsl(var(--muted-foreground));
+        }
+
+        .select {
+            display: flex;
+            width: 100%;
+            border-radius: var(--radius);
+            border: 1px solid hsl(var(--input));
+            background-color: hsl(var(--background));
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+        }
+
+        .select:focus {
+            outline: none;
+            border-color: hsl(var(--ring));
+            box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+        }
+
+        /* Badge Components */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 9999px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .badge-default {
+            background-color: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .badge-secondary {
+            background-color: hsl(var(--secondary));
+            color: hsl(var(--secondary-foreground));
+        }
+
+        .badge-destructive {
+            background-color: hsl(var(--destructive));
+            color: hsl(var(--destructive-foreground));
+        }
+
+        .badge-success {
+            background-color: hsl(var(--success));
+            color: hsl(var(--success-foreground));
+        }
+
+        .badge-warning {
+            background-color: hsl(var(--warning));
+            color: hsl(var(--warning-foreground));
+        }
+
+        .badge-outline {
+            color: hsl(var(--foreground));
+            border: 1px solid hsl(var(--border));
+        }
+
+        /* Layout Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+        /* Specific Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        /* Controls Panel */
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: hsl(var(--muted-foreground));
+            width: 1rem;
+            height: 1rem;
+        }
+
+        .search-input {
+            padding-left: 2.5rem;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .view-toggle {
+            display: flex;
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .view-btn {
+            padding: 0.5rem;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            transition: all 150ms ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .view-btn.active {
+            background-color: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .view-btn:not(.active):hover {
+            background-color: hsl(var(--muted));
+        }
+
+        /* Data List */
+        .data-list {
+            height: fit-content;
+        }
+
+        .list-content {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .data-item {
+            padding: 1.5rem;
+            border-bottom: 1px solid hsl(var(--border));
+            cursor: pointer;
+            transition: all 150ms ease-in-out;
+            position: relative;
+        }
+
+        .data-item:last-child {
+            border-bottom: none;
+        }
+
+        .data-item:hover {
+            background-color: hsl(var(--muted) / 0.5);
+        }
+
+        .data-item.selected {
+            background-color: hsl(var(--primary) / 0.1);
+            border-left: 3px solid hsl(var(--primary));
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .item-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .item-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            color: hsl(var(--muted-foreground));
+            font-size: 0.875rem;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .meta-icon {
+            width: 0.875rem;
+            height: 0.875rem;
+        }
+
+        /* Report Panel */
+        .report-panel {
+            position: sticky;
+            top: 1.5rem;
+        }
+
+        .selected-file-info {
+            background-color: hsl(var(--muted) / 0.5);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid hsl(var(--border));
+        }
+
+        .selected-file-info.empty {
+            text-align: center;
+            color: hsl(var(--muted-foreground));
+            padding: 2rem 1rem;
+        }
+
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-details {
+            font-size: 0.875rem;
+            color: hsl(var(--muted-foreground));
+            line-height: 1.5;
+        }
+
+        .format-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .format-btn {
+            justify-content: flex-start;
+            padding: 1rem;
+            height: auto;
+            position: relative;
+        }
+
+        .format-btn.loading::after {
+            content: '';
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid hsl(var(--muted-foreground));
+            border-radius: 50%;
+            border-top-color: hsl(var(--primary));
+            animation: spin 1s linear infinite;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .empty-icon {
+            width: 3rem;
+            height: 3rem;
+            margin: 0 auto 1rem;
+            opacity: 0.5;
+        }
+
+        /* Animations */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            
+            .report-panel {
+                position: static;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .page-title {
+                font-size: 1.875rem;
+                flex-direction: column;
+                gap: 0.5rem;
+                text-align: center;
+            }
+            
+            .controls-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .view-toggle {
+                width: 100%;
+            }
+            
+            .view-btn {
+                flex: 1;
+            }
+        }
+
+        /* Utility Classes */
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .text-sm { font-size: 0.875rem; }
+        .text-muted { color: hsl(var(--muted-foreground)); }
+        .font-medium { font-weight: 500; }
+        .font-semibold { font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">
+                <i data-lucide="shield-check"></i>
+                AuditLuma 报告生成器
+            </h1>
+            <p class="page-description">智能安全审计报告生成，支持多种格式导出</p>
+        </div>
+
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <div class="search-container">
+                <i data-lucide="search" class="search-icon"></i>
+                <input 
+                    type="text" 
+                    class="input search-input" 
+                    id="searchInput" 
+                    placeholder="搜索项目名称、时间或漏洞信息..."
+                    autocomplete="off"
+                >
+            </div>
+            
+            <div class="controls-row">
+                <select class="select" id="sortSelect" style="flex: 1;">
+                    <option value="time-desc">按时间排序 (最新)</option>
+                    <option value="time-asc">按时间排序 (最旧)</option>
+                    <option value="name-asc">按名称排序 (A-Z)</option>
+                    <option value="name-desc">按名称排序 (Z-A)</option>
+                    <option value="vuln-desc">按漏洞数排序 (高-低)</option>
+                    <option value="vuln-asc">按漏洞数排序 (低-高)</option>
+                </select>
+                
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="list">
+                        <i data-lucide="list"></i>
+                    </button>
+                    <button class="view-btn" data-view="grid">
+                        <i data-lucide="grid-3x3"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-grid">
+            <!-- Data List -->
+            <div class="card data-list">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i data-lucide="database"></i>
+                        历史分析数据
+                        <span id="resultCount" class="text-sm text-muted font-medium"></span>
+                    </h3>
+                </div>
+                <div class="list-content" id="dataList">
+                    <!-- Data items will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Report Generation Panel -->
+            <div class="card report-panel">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i data-lucide="file-text"></i>
+                        生成报告
+                    </h4>
+                </div>
+                <div class="card-content">
+                    <div class="selected-file-info empty" id="selectedFileInfo">
+                        <i data-lucide="mouse-pointer" style="width: 2rem; height: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+                        <p>请选择左侧的分析数据</p>
+                    </div>
+                    
+                    <div class="format-buttons">
+                        <button class="btn btn-outline format-btn" id="btn-txt" disabled onclick="generateReport('txt')">
+                            <i data-lucide="file-text"></i>
+                            <span>TXT 报告</span>
+                        </button>
+                        <button class="btn btn-outline format-btn" id="btn-json" disabled onclick="generateReport('json')">
+                            <i data-lucide="code"></i>
+                            <span>JSON 报告</span>
+                        </button>
+                        <button class="btn btn-outline format-btn" id="btn-excel" disabled onclick="generateReport('excel')">
+                            <i data-lucide="table"></i>
+                            <span>Excel 报告</span>
+                        </button>
+                        <button class="btn btn-outline format-btn" id="btn-html" disabled onclick="generateReport('html')">
+                            <i data-lucide="globe"></i>
+                            <span>HTML 报告</span>
+                        </button>
+                        <button class="btn btn-outline format-btn" id="btn-pdf" disabled onclick="generateReport('pdf')">
+                            <i data-lucide="file"></i>
+                            <span>PDF 报告</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        class ReportGenerator {
+            constructor() {
+                this.allData = [];
+                this.filteredData = [];
+                this.selectedFile = null;
+                this.currentSort = 'time-desc';
+                this.currentView = 'list';
+                
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.loadData();
+            }
+
+            bindEvents() {
+                // Search input
+                document.getElementById('searchInput').addEventListener('input', (e) => {
+                    this.handleSearch(e.target.value);
+                });
+
+                // Sort select
+                document.getElementById('sortSelect').addEventListener('change', (e) => {
+                    this.currentSort = e.target.value;
+                    this.sortAndRender();
+                });
+
+                // View toggle
+                document.querySelectorAll('.view-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.toggleView(e.currentTarget.dataset.view);
+                    });
+                });
+            }
+
+            async loadData() {
+                try {
+                    // Show loading skeleton
+                    this.showLoadingSkeleton();
+                    
+                    const response = await fetch('/api/history');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    this.allData = Array.isArray(data) ? data : [];
+                    this.filteredData = [...this.allData];
+                    this.sortAndRender();
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    this.showError('加载数据失败，请检查网络连接或刷新页面重试');
+                }
+            }
+
+            showLoadingSkeleton() {
+                const container = document.getElementById('dataList');
+                container.innerHTML = Array(5).fill(0).map(() => `
+                    <div class="data-item">
+                        <div class="item-header">
+                            <div style="flex: 1;">
+                                <div style="height: 1.25rem; background: hsl(var(--muted)); border-radius: 4px; margin-bottom: 0.5rem; width: 70%;"></div>
+                                <div style="height: 1rem; background: hsl(var(--muted)); border-radius: 4px; width: 50%;"></div>
+                            </div>
+                            <div style="width: 3rem; height: 1.5rem; background: hsl(var(--muted)); border-radius: 9999px;"></div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            handleSearch(query) {
+                if (!query.trim()) {
+                    this.filteredData = [...this.allData];
+                } else {
+                    const searchTerm = query.toLowerCase();
+                    this.filteredData = this.allData.filter(item => 
+                        (item.display_name || '').toLowerCase().includes(searchTerm) ||
+                        (item.project_name || '').toLowerCase().includes(searchTerm) ||
+                        (item.analysis_time || '').toLowerCase().includes(searchTerm) ||
+                        (item.vulnerabilities_count || 0).toString().includes(searchTerm)
+                    );
+                }
+                this.sortAndRender();
+            }
+
+            sortAndRender() {
+                this.sortData();
+                this.renderDataList();
+                this.updateResultCount();
+            }
+
+            sortData() {
+                this.filteredData.sort((a, b) => {
+                    switch (this.currentSort) {
+                        case 'time-desc':
+                            return new Date(b.analysis_time || 0) - new Date(a.analysis_time || 0);
+                        case 'time-asc':
+                            return new Date(a.analysis_time || 0) - new Date(b.analysis_time || 0);
+                        case 'name-asc':
+                            return (a.display_name || '').localeCompare(b.display_name || '');
+                        case 'name-desc':
+                            return (b.display_name || '').localeCompare(a.display_name || '');
+                        case 'vuln-desc':
+                            return (b.vulnerabilities_count || 0) - (a.vulnerabilities_count || 0);
+                        case 'vuln-asc':
+                            return (a.vulnerabilities_count || 0) - (b.vulnerabilities_count || 0);
+                        default:
+                            return 0;
+                    }
+                });
+            }
+
+            renderDataList() {
+                const container = document.getElementById('dataList');
+                
+                if (this.filteredData.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i data-lucide="search" class="empty-icon"></i>
+                            <p>没有找到匹配的数据</p>
+                        </div>
+                    `;
+                    lucide.createIcons();
+                    return;
+                }
+
+                container.innerHTML = this.filteredData.map(item => {
+                    const vulnerabilityLevel = this.getVulnerabilityLevel(item.vulnerabilities_count || 0);
+                    
+                    return `
+                        <div class="data-item fade-in" onclick="reportGenerator.selectFile('${item.filename || item.id}', this)" data-filename="${item.filename || item.id}">
+                            <div class="item-header">
+                                <div style="flex: 1;">
+                                    <div class="item-title">${this.escapeHtml(item.display_name || item.title || '未命名项目')}</div>
+                                    <div class="item-meta">
+                                        <div class="meta-item">
+                                            <i data-lucide="clock" class="meta-icon"></i>
+                                            <span>${this.formatDate(item.analysis_time || item.createdAt)}</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <i data-lucide="folder" class="meta-icon"></i>
+                                            <span>${this.escapeHtml(item.project_name || '未知项目')}</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <i data-lucide="file" class="meta-icon"></i>
+                                            <span>${item.scanned_files || 0} 个文件</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="badge ${vulnerabilityLevel}">
+                                    ${item.vulnerabilities_count || 0}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                lucide.createIcons();
+            }
+
+            getVulnerabilityLevel(count) {
+                if (count >= 10) return 'badge-destructive';
+                if (count >= 5) return 'badge-warning';
+                if (count > 0) return 'badge-success';
+                return 'badge-secondary';
+            }
+
+            updateResultCount() {
+                const countElement = document.getElementById('resultCount');
+                const total = this.allData.length;
+                const filtered = this.filteredData.length;
+                
+                if (filtered === total) {
+                    countElement.textContent = `(${total} 项)`;
+                } else {
+                    countElement.textContent = `(${filtered}/${total} 项)`;
+                }
+            }
+
+            selectFile(filename, element) {
+                // Remove previous selection
+                document.querySelectorAll('.data-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+
+                // Add selection to current item
+                element.classList.add('selected');
+
+                // Find selected file data
+                const fileData = this.allData.find(item => (item.filename || item.id) === filename);
+                if (!fileData) return;
+
+                this.selectedFile = filename;
+                this.updateSelectedFileInfo(fileData);
+                this.enableReportButtons();
+            }
+
+            updateSelectedFileInfo(fileData) {
+                const container = document.getElementById('selectedFileInfo');
+                container.className = 'selected-file-info';
+                container.innerHTML = `
+                    <div class="file-name">${this.escapeHtml(fileData.display_name || fileData.title || '未命名项目')}</div>
+                    <div class="file-details">
+                        <div>项目: ${this.escapeHtml(fileData.project_name || '未知项目')}</div>
+                        <div>时间: ${this.formatDate(fileData.analysis_time || fileData.createdAt)}</div>
+                        <div>漏洞: ${fileData.vulnerabilities_count || 0} 个</div>
+                        <div>文件: ${fileData.scanned_files || 0} 个</div>
+                    </div>
+                `;
+            }
+
+            enableReportButtons() {
+                ['txt', 'json', 'excel', 'html', 'pdf'].forEach(format => {
+                    const btn = document.getElementById(`btn-${format}`);
+                    if (btn) {
+                        btn.disabled = false;
+                    }
+                });
+            }
+
+            toggleView(view) {
+                // Update button states
+                document.querySelectorAll('.view-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.view === view);
+                });
+
+                this.currentView = view;
+                // View toggle functionality can be extended here
+            }
+
+            async generateReport(format) {
+                if (!this.selectedFile) {
+                    this.showNotification('请先选择分析数据文件', 'warning');
+                    return;
+                }
+
+                const button = document.getElementById(`btn-${format}`);
+                const originalContent = button.innerHTML;
+                
+                // Show loading state
+                button.disabled = true;
+                button.classList.add('loading');
+
+                try {
+                    const response = await fetch('/api/generate-report', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            data_file: this.selectedFile,
+                            format: format
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showNotification(`${format.toUpperCase()} 报告生成成功！`, 'success');
+                        
+                        // If there's a download URL, trigger download
+                        if (result.download_url) {
+                            const link = document.createElement('a');
+                            link.href = result.download_url;
+                            link.download = result.filename || `report.${format}`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                    } else {
+                        this.showNotification(`报告生成失败: ${result.error || '未知错误'}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error generating report:', error);
+                    this.showNotification('生成报告时发生错误，请重试', 'error');
+                } finally {
+                    // Restore button state
+                    button.disabled = false;
+                    button.classList.remove('loading');
+                    button.innerHTML = originalContent;
+                    lucide.createIcons();
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                // Create a simple toast notification
+                const toast = document.createElement('div');
+                toast.className = `notification ${type}`;
+                toast.style.cssText = `
+                    position: fixed;
+                    top: 1rem;
+                    right: 1rem;
+                    background: hsl(var(--card));
+                    border: 1px solid hsl(var(--border));
+                    border-radius: var(--radius);
+                    padding: 1rem;
+                    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+                    z-index: 1000;
+                    max-width: 400px;
+                    transform: translateX(100%);
+                    transition: transform 0.3s ease-in-out;
+                `;
+                
+                if (type === 'success') {
+                    toast.style.borderColor = 'hsl(var(--success))';
+                    toast.style.backgroundColor = 'hsl(var(--success) / 0.1)';
+                } else if (type === 'error') {
+                    toast.style.borderColor = 'hsl(var(--destructive))';
+                    toast.style.backgroundColor = 'hsl(var(--destructive) / 0.1)';
+                } else if (type === 'warning') {
+                    toast.style.borderColor = 'hsl(var(--warning))';
+                    toast.style.backgroundColor = 'hsl(var(--warning) / 0.1)';
+                }
+                
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                
+                // Animate in
+                setTimeout(() => {
+                    toast.style.transform = 'translateX(0)';
+                }, 10);
+                
+                // Auto remove after 5 seconds
+                setTimeout(() => {
+                    toast.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (toast.parentNode) {
+                            document.body.removeChild(toast);
+                        }
+                    }, 300);
+                }, 5000);
+            }
+
+            showError(message) {
+                const container = document.getElementById('dataList');
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i data-lucide="alert-triangle" class="empty-icon" style="color: hsl(var(--destructive));"></i>
+                        <p>${message}</p>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+
+            formatDate(dateString) {
+                if (!dateString) return '未知时间';
+                try {
+                    const date = new Date(dateString);
+                    return date.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                } catch (error) {
+                    return dateString;
+                }
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text || '';
+                return div.innerHTML;
+            }
+        }
+
+        // Initialize the report generator
+        const reportGenerator = new ReportGenerator();
+
+        // Global function for onclick handlers
+        function generateReport(format) {
+            reportGenerator.generateReport(format);
+        }
+    </script>
+</body>
+</html>
