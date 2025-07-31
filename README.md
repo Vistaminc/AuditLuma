@@ -408,6 +408,10 @@ AuditLuma支持以下报告格式：
   </div>
 </div>
 
+## 合作伙伴
+
+- [棉花糖网络安全圈](https://vip.bdziyi.com/)
+
 ## 📜 许可证
 
 MIT
