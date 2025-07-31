@@ -145,6 +145,254 @@ class SelfRAGConfig(BaseModel):
     relevance_threshold: float = 0.75
 
 
+class HaystackConfig(BaseModel):
+    """Haystack编排层配置"""
+    enabled: bool = True
+    max_workers: int = 10
+    task_timeout: int = 300  # 任务超时时间（秒）
+    retry_attempts: int = 3
+    retry_delay: float = 1.0
+    enable_parallel_execution: bool = True
+    load_balancing: bool = True
+    performance_monitoring: bool = True
+    
+    # Haystack-AI管道配置
+    use_haystack_ai: bool = True  # 是否使用官方Haystack-AI库
+    max_tokens: int = 2000
+    temperature: float = 0.1
+    top_k: int = 5
+    similarity_threshold: float = 0.7
+    enable_embeddings: bool = True
+    enable_ranking: bool = True
+    enable_document_splitting: bool = True
+    
+    # 错误处理和回退
+    enable_fallback: bool = True  # 启用回退到传统方法
+    fallback_on_error: bool = True  # 出错时回退
+    circuit_breaker_enabled: bool = True
+    circuit_breaker_threshold: int = 5
+    
+    def get_task_model(self, task_type: str) -> str:
+        """获取特定任务类型的模型"""
+        # 从主配置获取模型配置
+        if hasattr(Config, 'hierarchical_rag_models'):
+            models_config = Config.hierarchical_rag_models
+            if models_config and models_config.get('enabled', False):
+                haystack_models = models_config.get('haystack', {})
+                task_models = haystack_models.get('task_models', {})
+                
+                # 返回任务特定模型或默认模型
+                return task_models.get(task_type) or haystack_models.get('default_model', 'gpt-3.5-turbo@openai')
+        
+        # 回退到默认模型
+        return 'gpt-3.5-turbo@openai'
+    
+    def get_task_config(self, task_type: str) -> Dict[str, Any]:
+        """获取特定任务类型的配置"""
+        # 任务特定参数配置
+        task_params = {
+            "security_scan": {
+                "max_tokens": 2500,
+                "temperature": 0.05
+            },
+            "syntax_check": {
+                "max_tokens": 1500,
+                "temperature": 0.0
+            },
+            "logic_analysis": {
+                "max_tokens": 2000,
+                "temperature": 0.1
+            },
+            "dependency_analysis": {
+                "max_tokens": 1800,
+                "temperature": 0.1
+            }
+        }
+        
+        task_config = task_params.get(task_type, {})
+        
+        # 合并配置
+        merged_config = {
+            "model_name": self.get_task_model(task_type),
+            "max_tokens": task_config.get("max_tokens", self.max_tokens),
+            "temperature": task_config.get("temperature", self.temperature),
+            "top_k": self.top_k,
+            "similarity_threshold": self.similarity_threshold,
+            "enable_embeddings": self.enable_embeddings,
+            "enable_ranking": self.enable_ranking
+        }
+        
+        return merged_config
+
+
+class TxtaiConfig(BaseModel):
+    """txtai知识检索层配置"""
+    enabled: bool = True
+    cve_database_url: str = "https://cve.circl.lu/api"
+    cve_cache_ttl: int = 3600  # CVE缓存时间（秒）
+    best_practices_sources: List[str] = Field(default_factory=lambda: ["owasp", "sans", "nist"])
+    historical_cases_limit: int = 100
+    similarity_threshold: float = 0.8
+    retrieval_timeout: int = 30
+    enable_incremental_update: bool = True
+    knowledge_cache_size: int = 1000
+
+
+class R2RConfig(BaseModel):
+    """R2R上下文增强层配置"""
+    enabled: bool = True
+    max_call_depth: int = 10
+    enable_cross_file_analysis: bool = True
+    enable_data_flow_analysis: bool = True
+    enable_taint_analysis: bool = True
+    context_window_size: int = 500
+    semantic_similarity_threshold: float = 0.7
+    impact_assessment_enabled: bool = True
+    context_expansion_enabled: bool = True
+
+
+class SelfRAGValidationConfig(BaseModel):
+    """Self-RAG验证层配置"""
+    enabled: bool = True
+    cross_validation_enabled: bool = True
+    confidence_threshold: float = 0.7
+    false_positive_filter_enabled: bool = True
+    quality_assessment_enabled: bool = True
+    validation_timeout: int = 60
+    min_consensus_score: float = 0.6
+    explanation_required: bool = True
+
+
+class CacheConfig(BaseModel):
+    """缓存系统配置"""
+    enabled: bool = True
+    l1_cache_size: str = "256MB"  # 内存缓存大小
+    l2_cache_size: str = "2GB"    # 磁盘缓存大小
+    distributed_cache_enabled: bool = False
+    redis_url: str = "redis://localhost:6379"
+    cache_ttl: int = 3600
+    cache_compression: bool = True
+
+
+class MonitoringConfig(BaseModel):
+    """监控系统配置"""
+    enabled: bool = True
+    performance_tracking: bool = True
+    quality_tracking: bool = True
+    health_check_interval: int = 60  # 健康检查间隔（秒）
+    metrics_retention_days: int = 30
+    alert_thresholds: Dict[str, float] = Field(default_factory=lambda: {
+        "processing_time": 300.0,
+        "error_rate": 0.1,
+        "confidence_score": 0.5
+    })
+    log_level: str = "INFO"
+
+
+class SecurityConfig(BaseModel):
+    """安全配置"""
+    enabled: bool = True
+    data_encryption: bool = False
+    access_control: bool = False
+    audit_logging: bool = True
+    rate_limiting: bool = True
+    max_requests_per_minute: int = 100
+    api_key_required: bool = False
+    secure_headers: bool = True
+
+
+class HierarchicalRAGConfig(BaseModel):
+    """层级RAG架构配置"""
+    enabled: bool = False  # 默认关闭，需要显式启用
+    architecture_mode: str = "hierarchical"  # "traditional" 或 "hierarchical"
+    
+    # 各层配置
+    haystack: HaystackConfig = Field(default_factory=HaystackConfig)
+    txtai: TxtaiConfig = Field(default_factory=TxtaiConfig)
+    r2r: R2RConfig = Field(default_factory=R2RConfig)
+    self_rag_validation: SelfRAGValidationConfig = Field(default_factory=SelfRAGValidationConfig)
+    
+    # 系统配置
+    cache: CacheConfig = Field(default_factory=CacheConfig)
+    monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
+    
+    # 兼容性配置
+    backward_compatibility: bool = True
+    migration_enabled: bool = True
+    ab_testing_enabled: bool = False
+    fallback_to_traditional: bool = True
+    
+    def is_layer_enabled(self, layer_name: str) -> bool:
+        """检查指定层是否启用"""
+        if not self.enabled:
+            return False
+        
+        layer_map = {
+            "haystack": self.haystack.enabled,
+            "txtai": self.txtai.enabled,
+            "r2r": self.r2r.enabled,
+            "self_rag_validation": self.self_rag_validation.enabled
+        }
+        
+        return layer_map.get(layer_name, False)
+    
+    def get_layer_config(self, layer_name: str) -> Optional[BaseModel]:
+        """获取指定层的配置"""
+        layer_map = {
+            "haystack": self.haystack,
+            "txtai": self.txtai,
+            "r2r": self.r2r,
+            "self_rag_validation": self.self_rag_validation,
+            "cache": self.cache,
+            "monitoring": self.monitoring,
+            "security": self.security
+        }
+        
+        return layer_map.get(layer_name)
+    
+    def validate_configuration(self) -> List[str]:
+        """验证配置的有效性，返回错误列表"""
+        errors = []
+        
+        if self.enabled:
+            # 检查至少有一个处理层启用
+            processing_layers = [
+                self.haystack.enabled,
+                self.txtai.enabled,
+                self.r2r.enabled,
+                self.self_rag_validation.enabled
+            ]
+            
+            if not any(processing_layers):
+                errors.append("至少需要启用一个处理层")
+            
+            # 检查Haystack配置
+            if self.haystack.enabled:
+                if self.haystack.max_workers <= 0:
+                    errors.append("Haystack max_workers 必须大于0")
+                if self.haystack.task_timeout <= 0:
+                    errors.append("Haystack task_timeout 必须大于0")
+            
+            # 检查txtai配置
+            if self.txtai.enabled:
+                if self.txtai.similarity_threshold < 0 or self.txtai.similarity_threshold > 1:
+                    errors.append("txtai similarity_threshold 必须在0-1之间")
+            
+            # 检查R2R配置
+            if self.r2r.enabled:
+                if self.r2r.max_call_depth <= 0:
+                    errors.append("R2R max_call_depth 必须大于0")
+            
+            # 检查Self-RAG验证配置
+            if self.self_rag_validation.enabled:
+                if (self.self_rag_validation.confidence_threshold < 0 or 
+                    self.self_rag_validation.confidence_threshold > 1):
+                    errors.append("Self-RAG confidence_threshold 必须在0-1之间")
+        
+        return errors
+
+
 class VulnerabilityDBConfig(BaseModel):
     """漏洞数据库配置"""
     sources: List[str] = Field(default_factory=list)
@@ -169,6 +417,65 @@ class DefaultModelsConfig(BaseModel):
     summarization: str = "gpt-3.5-turbo"
 
 
+class HierarchicalRAGModelsConfig(BaseModel):
+    """层级RAG架构模型配置"""
+    enabled: bool = True
+    
+    # Haystack编排层配置
+    haystack: Dict[str, Any] = Field(default_factory=lambda: {
+        "orchestrator_type": "ai",  # 默认使用Haystack-AI编排器
+        "default_model": "gpt-3.5-turbo@openai",
+        "task_models": {
+            "security_scan": "gpt-4@openai",
+            "syntax_check": "gpt-3.5-turbo@openai",
+            "logic_analysis": "gpt-3.5-turbo@openai",
+            "dependency_analysis": "gpt-3.5-turbo@openai"
+        }
+    })
+    
+    # txtai知识检索层模型配置
+    txtai: Dict[str, str] = Field(default_factory=lambda: {
+        "retrieval_model": "gpt-3.5-turbo@openai",
+        "embedding_model": "text-embedding-ada-002@openai"
+    })
+    
+    # R2R上下文增强层模型配置
+    r2r: Dict[str, str] = Field(default_factory=lambda: {
+        "context_model": "gpt-3.5-turbo@openai",
+        "enhancement_model": "gpt-3.5-turbo@openai"
+    })
+    
+    # Self-RAG验证层模型配置
+    self_rag_validation: Dict[str, Any] = Field(default_factory=lambda: {
+        "validation_model": "gpt-3.5-turbo@openai",
+        "cross_validation_models": [
+            "gpt-4@openai",
+            "deepseek-chat@deepseek",
+            "gpt-3.5-turbo@openai"
+        ]
+    })
+    
+    def get_model_for_layer(self, layer: str, model_type: str = "default") -> str:
+        """获取指定层的模型"""
+        layer_config = getattr(self, layer, {})
+        
+        if layer == "haystack":
+            if model_type == "default":
+                return layer_config.get("default_model", "gpt-3.5-turbo@openai")
+            else:
+                return layer_config.get("task_models", {}).get(model_type, layer_config.get("default_model", "gpt-3.5-turbo@openai"))
+        else:
+            return layer_config.get(f"{model_type}_model", layer_config.get("default_model", "gpt-3.5-turbo@openai"))
+    
+    def get_task_model(self, task_type: str) -> str:
+        """获取特定任务类型的模型"""
+        return self.get_model_for_layer("haystack", task_type)
+    
+    def get_orchestrator_type(self) -> str:
+        """获取编排器类型"""
+        return self.haystack.get("orchestrator_type", "ai")
+
+
 class Config:
     """全局配置类，从config.yaml加载"""
     global_config = GlobalConfig()
@@ -189,6 +496,8 @@ class Config:
     vulnerability_db = VulnerabilityDBConfig()
     output = OutputConfig()
     default_models = DefaultModelsConfig()
+    hierarchical_rag_models = HierarchicalRAGModelsConfig()
+    hierarchical_rag = HierarchicalRAGConfig()
     
     @classmethod
     def load_from_dict(cls, config_data: Dict[str, Any]) -> None:
@@ -259,6 +568,14 @@ class Config:
         # 加载默认模型配置
         if "default_models" in config_data:
             cls.default_models = DefaultModelsConfig(**config_data["default_models"])
+        
+        # 加载层级RAG模型配置
+        if "hierarchical_rag_models" in config_data:
+            cls.hierarchical_rag_models = HierarchicalRAGModelsConfig(**config_data["hierarchical_rag_models"])
+        
+        # 加载层级RAG配置
+        if "hierarchical_rag" in config_data:
+            cls.hierarchical_rag = HierarchicalRAGConfig(**config_data["hierarchical_rag"])
     
     @classmethod
     def to_dict(cls) -> Dict[str, Any]:
@@ -281,7 +598,9 @@ class Config:
             "mcp": cls.mcp.dict(),
             "vulnerability_db": cls.vulnerability_db.dict(),
             "output": cls.output.dict(),
-            "default_models": cls.default_models.dict()
+            "default_models": cls.default_models.dict(),
+            "hierarchical_rag_models": cls.hierarchical_rag_models.dict(),
+            "hierarchical_rag": cls.hierarchical_rag.dict()
         }
     
     @classmethod
@@ -343,6 +662,66 @@ class Config:
         provider_name = detect_provider_from_model(model_name)
         
         return model_name, provider_name
+    
+    @classmethod
+    def is_hierarchical_rag_enabled(cls) -> bool:
+        """检查层级RAG是否启用"""
+        return cls.hierarchical_rag.enabled
+    
+    @classmethod
+    def get_architecture_mode(cls) -> str:
+        """获取架构模式"""
+        return cls.hierarchical_rag.architecture_mode
+    
+    @classmethod
+    def validate_hierarchical_rag_config(cls) -> List[str]:
+        """验证层级RAG配置"""
+        return cls.hierarchical_rag.validate_configuration()
+    
+    @classmethod
+    def get_hierarchical_layer_config(cls, layer_name: str) -> Optional[BaseModel]:
+        """获取层级RAG指定层的配置"""
+        return cls.hierarchical_rag.get_layer_config(layer_name)
+    
+    @classmethod
+    def is_hierarchical_layer_enabled(cls, layer_name: str) -> bool:
+        """检查层级RAG指定层是否启用"""
+        return cls.hierarchical_rag.is_layer_enabled(layer_name)
+    
+    @classmethod
+    def get_hierarchical_model(cls, layer: str, model_type: str = "default") -> str:
+        """获取层级RAG指定层的模型"""
+        return cls.hierarchical_rag_models.get_model_for_layer(layer, model_type)
+    
+    @classmethod
+    def get_task_model(cls, task_type: str) -> str:
+        """获取特定任务类型的模型"""
+        return cls.hierarchical_rag_models.get_task_model(task_type)
+    
+    @classmethod
+    def get_layer_model(cls, layer: str, model_type: str) -> str:
+        """获取指定层的指定类型模型"""
+        return cls.hierarchical_rag_models.get_model_for_layer(layer, model_type)
+    
+    @classmethod
+    def get_txtai_models(cls) -> Dict[str, str]:
+        """获取txtai层的模型配置"""
+        return cls.hierarchical_rag_models.txtai
+    
+    @classmethod
+    def get_r2r_models(cls) -> Dict[str, str]:
+        """获取R2R层的模型配置"""
+        return cls.hierarchical_rag_models.r2r
+    
+    @classmethod
+    def get_self_rag_models(cls) -> Dict[str, Any]:
+        """获取Self-RAG层的模型配置"""
+        return cls.hierarchical_rag_models.self_rag_validation
+    
+    @classmethod
+    def is_hierarchical_models_enabled(cls) -> bool:
+        """检查层级RAG模型配置是否启用"""
+        return cls.hierarchical_rag_models.enabled
 
 
 def load_config(config_path: str = "./config/config.yaml") -> None:

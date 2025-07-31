@@ -14,7 +14,7 @@ from loguru import logger
 
 from auditluma.models.code import SourceFile, CodeUnit, FileType
 from auditluma.parsers.code_parser import extract_code_units
-from auditluma.rag.self_rag import self_rag
+from auditluma.rag.enhanced_self_rag import enhanced_self_rag as self_rag
 
 
 class AnalysisLevel(Enum):

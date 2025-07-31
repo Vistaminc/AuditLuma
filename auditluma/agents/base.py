@@ -16,7 +16,8 @@ from auditluma.mcp.protocol import (
     AgentMessage, MessageType, MessagePriority, 
     message_bus, agent_coordinator
 )
-from auditluma.rag.self_rag import self_rag, Document
+from auditluma.rag.enhanced_self_rag import enhanced_self_rag as self_rag
+from auditluma.rag.self_rag import Document
 
 
 class BaseAgent(ABC):

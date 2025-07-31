@@ -1,0 +1,241 @@
+# 增强Self-RAG系统配置文件
+# Enhanced Self-RAG System Configuration
+
+# 增强Self-RAG系统配置
+enhanced_self_rag:
+  # 基本功能开关
+  enable_validation: true          # 启用验证功能
+  enable_quality_assessment: true  # 启用质量评估
+  batch_size: 10                  # 批处理大小
+  
+  # 验证器配置
+  validator_config:
+    confidence_threshold: 0.75     # 置信度阈值
+    validation_timeout: 60         # 验证超时时间（秒）
+    max_concurrent_validations: 10 # 最大并发验证数
+  
+  # 假阳性过滤器配置
+  false_positive_filter_config:
+    confidence_threshold: 0.7      # 过滤置信度阈值
+    enable_learning: true          # 启用学习功能
+    max_concurrent_filters: 5      # 最大并发过滤器数
+
+# 交叉验证配置
+cross_validation:
+  models:
+    primary_security:
+      model_name: "gpt-4"
+      weight: 1.0
+      timeout: 30
+      validation_prompt_template: |
+        请验证以下代码漏洞是否为真实的安全问题：
+        
+        漏洞类型: {vulnerability_type}
+        严重程度: {severity}
+        文件路径: {file_path}
+        代码片段:
+        {snippet}
+        
+        描述: {description}
+        
+        请分析这是否为真实的安全漏洞，并给出置信度评分（0-1）。
+        请以JSON格式回复：
+        {{
+            "is_valid": true/false,
+            "confidence": 0.0-1.0,
+            "reasoning": "详细推理过程"
+        }}
+    
+    secondary_analysis:
+      model_name: "claude-3-sonnet"
+      weight: 0.8
+      timeout: 25
+      validation_prompt_template: |
+        作为安全专家，请评估以下代码是否存在安全漏洞：
+        
+        类型: {vulnerability_type}
+        文件: {file_path}
+        代码:
+        {snippet}
+        
+        说明: {description}
+        
+        请提供：
+        1. 是否为真实漏洞 (true/false)
+        2. 置信度评分 (0.0-1.0)
+        3. 详细分析理由
+        
+        格式：JSON
+
+# 置信度计算器配置
+confidence_calculator:
+  # 各维度权重配置
+  dimension_weights:
+    code_quality: 0.15
+    pattern_match: 0.20
+    context_completeness: 0.15
+    historical_accuracy: 0.15
+    cross_validation: 0.20
+    knowledge_relevance: 0.10
+    semantic_coherence: 0.05
+  
+  # 动态权重调整
+  enable_weight_adaptation: true
+  adaptation_learning_rate: 0.01
+  min_weight: 0.01
+  max_weight: 0.5
+
+# 质量评估器配置
+quality_assessor:
+  # 维度权重配置
+  dimension_weights:
+    accuracy: 0.25
+    precision: 0.20
+    recall: 0.15
+    f1_score: 0.10
+    confidence_calibration: 0.10
+    consistency: 0.08
+    completeness: 0.07
+    timeliness: 0.03
+    robustness: 0.02
+  
+  # 质量等级阈值
+  quality_thresholds:
+    excellent: 0.9
+    good: 0.75
+    fair: 0.6
+    poor: 0.4
+    critical: 0.0
+  
+  # 基准配置
+  benchmarks:
+    accuracy:
+      target_score: 0.95
+      minimum_score: 0.85
+      description: "准确性基准：目标95%，最低85%"
+    
+    precision:
+      target_score: 0.90
+      minimum_score: 0.80
+      description: "精确率基准：目标90%，最低80%"
+    
+    recall:
+      target_score: 0.85
+      minimum_score: 0.75
+      description: "召回率基准：目标85%，最低75%"
+    
+    consistency:
+      target_score: 0.88
+      minimum_score: 0.75
+      description: "一致性基准：目标88%，最低75%"
+
+# 假阳性过滤规则配置
+false_positive_rules:
+  # 测试文件规则
+  test_file_patterns:
+    - "test[s]?[/\\\\]"
+    - "[/\\\\]test[s]?[/\\\\]"
+    - "\\.test\\."
+    - "_test\\."
+    - "spec[s]?[/\\\\]"
+    - "\\.spec\\."
+    - "_spec\\."
+    - "mock[s]?[/\\\\]"
+    - "fixture[s]?[/\\\\]"
+  
+  # 示例代码规则
+  example_code_patterns:
+    - "example[s]?[/\\\\]"
+    - "demo[s]?[/\\\\]"
+    - "sample[s]?[/\\\\]"
+    - "tutorial[s]?[/\\\\]"
+    - "playground[/\\\\]"
+    - "\\.example\\."
+    - "\\.demo\\."
+  
+  # 注释规则
+  comment_patterns:
+    - "^\\s*//.*"
+    - "^\\s*#.*"
+    - "^\\s*/\\*.*\\*/"
+    - "^\\s*<!--.*-->"
+    - "^\\s*\\*.*"
+    - "^\\s*\"\"\".*\"\"\""
+    - "^\\s*'''.*'''"
+  
+  # 文档规则
+  documentation_patterns:
+    - "doc[s]?[/\\\\]"
+    - "readme"
+    - "\\.md$"
+    - "\\.rst$"
+    - "\\.txt$"
+    - "changelog"
+    - "license"
+  
+  # 占位符规则
+  placeholder_patterns:
+    - "<placeholder>"
+    - "\\{\\{.*\\}\\}"
+    - "\\$\\{.*\\}"
+    - "example\\.com"
+    - "localhost"
+    - "127\\.0\\.0\\.1"
+    - "TODO"
+    - "FIXME"
+    - "XXX"
+
+# 性能配置
+performance:
+  # 并发控制
+  max_concurrent_validations: 10
+  max_concurrent_assessments: 5
+  max_concurrent_filters: 5
+  
+  # 超时设置
+  validation_timeout: 60
+  assessment_timeout: 30
+  filter_timeout: 10
+  
+  # 批处理设置
+  default_batch_size: 10
+  max_batch_size: 50
+  
+  # 缓存设置
+  enable_caching: true
+  cache_ttl: 3600  # 缓存生存时间（秒）
+  max_cache_size: 1000
+
+# 日志配置
+logging:
+  level: "INFO"
+  enable_detailed_logging: false
+  log_validation_details: true
+  log_quality_metrics: true
+  log_performance_stats: true
+
+# 学习配置
+learning:
+  enable_feedback_learning: true
+  historical_data_retention_days: 365
+  pattern_expiry_days: 90
+  learning_rate: 0.1
+  min_feedback_confidence: 0.6
+
+# 集成配置
+integration:
+  # 与现有系统的兼容性
+  backward_compatibility: true
+  
+  # 知识库集成
+  knowledge_base_integration: true
+  auto_knowledge_update: true
+  
+  # 外部系统集成
+  enable_external_validators: false
+  external_validator_endpoints: []
+  
+  # 报告集成
+  enable_quality_reports: true
+  report_export_formats: ["json", "yaml", "csv"]
+  auto_export_reports: false

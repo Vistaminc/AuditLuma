@@ -1,0 +1,202 @@
+# 阿里云CVE爬虫与Task 3集成配置
+
+# 爬虫配置
+crawler:
+  # 基本设置
+  enabled: true
+  max_pages: 10
+  delay_range: [2, 5]  # 请求间隔范围（秒）
+  timeout: 30
+  headless: true
+  
+  # 更新策略
+  update_strategy:
+    # 增量更新间隔（小时）
+    incremental_interval: 6
+    # 全量更新间隔（小时）
+    full_update_interval: 168  # 7天
+    # 每次增量更新的天数
+    incremental_days: 1
+  
+  # 数据存储
+  data_storage:
+    base_dir: "./data/aliyun_cve"
+    cache_ttl: 86400  # 24小时
+    max_cache_size: 1000
+  
+  # 性能优化
+  performance:
+    max_concurrent: 5
+    batch_size: 50
+    retry_count: 3
+
+# txtai检索器集成配置
+txtai_integration:
+  # 启用爬虫数据集成
+  enable_crawler_data: true
+  
+  # 数据源优先级
+  source_priority:
+    aliyun_crawler: 1    # 最高优先级
+    nvd_api: 2
+    mitre: 3
+    local_cache: 4
+  
+  # 结果合并策略
+  merge_strategy:
+    # 最大结果数
+    max_results: 20
+    # 去重策略
+    deduplication: true
+    # 相关性阈值
+    relevance_threshold: 0.3
+  
+  # 缓存策略
+  cache_strategy:
+    # 启用多级缓存
+    enable_multilevel_cache: true
+    # L1缓存（内存）
+    l1_cache:
+      size: 1000
+      ttl: 3600  # 1小时
+    # L2缓存（磁盘）
+    l2_cache:
+      size: 10000
+      ttl: 86400  # 24小时
+
+# 知识源管理器配置
+knowledge_manager:
+  # CVE数据源配置
+  cve_source:
+    name: "enhanced_cve_database"
+    type: "cve_database"
+    enabled: true
+    priority: 1
+    timeout: 30
+    config:
+      enable_aliyun_crawler: true
+      crawler_weight: 0.6  # 爬虫数据权重
+      api_weight: 0.4      # API数据权重
+  
+  # 健康检查配置
+  health_check:
+    interval: 300  # 5分钟
+    timeout: 10
+    retry_count: 3
+  
+  # 更新任务配置
+  update_tasks:
+    # 启用定时更新
+    enable_scheduled_update: true
+    # 更新间隔（秒）
+    update_interval: 21600  # 6小时
+    # 更新时间窗口（避免高峰期）
+    update_window:
+      start_hour: 2   # 凌晨2点
+      end_hour: 6     # 凌晨6点
+
+# 质量控制配置
+quality_control:
+  # 数据验证
+  data_validation:
+    # 启用CVE ID格式验证
+    validate_cve_format: true
+    # 启用CVSS分数验证
+    validate_cvss_score: true
+    # 启用日期格式验证
+    validate_date_format: true
+  
+  # 过滤规则
+  filtering:
+    # 最小CVSS分数
+    min_cvss_score: 0.0
+    # 排除的CWE类型
+    excluded_cwe_types: []
+    # 最大描述长度
+    max_description_length: 5000
+  
+  # 去重配置
+  deduplication:
+    # 启用智能去重
+    enable_smart_dedup: true
+    # 相似度阈值
+    similarity_threshold: 0.9
+    # 去重字段
+    dedup_fields: ["cve_id", "description"]
+
+# 监控和日志配置
+monitoring:
+  # 性能监控
+  performance_monitoring:
+    enabled: true
+    # 监控指标
+    metrics:
+      - "crawl_success_rate"
+      - "integration_latency"
+      - "cache_hit_rate"
+      - "data_freshness"
+    # 告警阈值
+    alerts:
+      crawl_failure_threshold: 0.1  # 10%失败率
+      latency_threshold: 5.0         # 5秒延迟
+      cache_miss_threshold: 0.5      # 50%缓存未命中
+  
+  # 日志配置
+  logging:
+    level: "INFO"
+    # 日志文件
+    files:
+      crawler: "./logs/crawler.log"
+      integration: "./logs/integration.log"
+      performance: "./logs/performance.log"
+    # 日志轮转
+    rotation:
+      size: "100MB"
+      retention: "7 days"
+
+# 安全配置
+security:
+  # 访问控制
+  access_control:
+    # 启用IP白名单
+    enable_ip_whitelist: false
+    # 白名单IP
+    whitelist_ips: []
+  
+  # 数据加密
+  encryption:
+    # 启用敏感数据加密
+    enable_data_encryption: false
+    # 加密算法
+    algorithm: "AES-256"
+  
+  # 审计日志
+  audit_logging:
+    enabled: true
+    # 审计事件
+    events:
+      - "data_access"
+      - "configuration_change"
+      - "system_update"
+
+# 开发和调试配置
+development:
+  # 调试模式
+  debug_mode: false
+  
+  # 测试配置
+  testing:
+    # 使用测试数据
+    use_test_data: false
+    # 测试数据文件
+    test_data_file: "./test_data/sample_cves.json"
+    # 模拟延迟
+    simulate_delay: false
+  
+  # 性能分析
+  profiling:
+    enabled: false
+    # 分析工具
+    profiler: "cProfile"
+    # 输出文件
+    output_file: "./profiling/crawler_profile.prof"

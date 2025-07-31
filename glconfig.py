@@ -2,7 +2,7 @@ version = '1.2.0'
 contact = ''
 github = 'github.com/vistaminc'
 website = 'https://www.vistamin.cn'
-copyright = '© 2022-2024 Vistamin Technology Co., Ltd. All rights reserved.'
+copyright = '© 2022-2025 Vistamin Technology Co., Ltd. All rights reserved.'
 license = 'MIT License'
 description = [
     '支持本地大模型',

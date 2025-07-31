@@ -38,7 +38,7 @@ venv.bak/
 # Project specific
 data/
 logs/*.log
-config/config.yaml
+
 auditluma.*.log
 auditluma.*.log.zip
 *.log

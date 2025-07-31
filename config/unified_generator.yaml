@@ -1,0 +1,114 @@
+# Unified Haystack Generator Configuration
+# This file configures the unified generator component for different LLM providers
+
+unified_generator:
+  # Default provider to use when not explicitly specified
+  # Options: "auto", "openai", "ollama"
+  default_provider: "auto"
+  
+  # Global timeout for API requests (seconds)
+  timeout: 30.0
+  
+  # Maximum number of retry attempts for failed requests
+  max_retries: 3
+  
+  # Base delay between retry attempts (seconds)
+  retry_delay: 1.0
+  
+  # Provider-specific configurations
+  providers:
+    # OpenAI configuration
+    openai:
+      # API key - can use environment variable substitution
+      api_key: "${OPENAI_API_KEY}"
+      
+      # Base URL for OpenAI API (optional, defaults to official API)
+      base_url: "https://api.openai.com/v1"
+      
+      # List of supported models
+      models:
+        - "gpt-4"
+        - "gpt-4-turbo"
+        - "gpt-4-turbo-preview"
+        - "gpt-3.5-turbo"
+        - "gpt-3.5-turbo-16k"
+        - "text-davinci-003"
+    
+    # Ollama configuration
+    ollama:
+      # Base URL for Ollama service
+      base_url: "${OLLAMA_BASE_URL:http://localhost:11434}"
+      
+      # List of available models (these should be pulled/available in Ollama)
+      models:
+        - "qwen3:32b"
+        - "deepseek-r1:1.5b"
+        - "llama2:7b"
+        - "llama2:13b"
+        - "codellama:13b"
+        - "mistral:7b"
+        - "yi:34b-chat"
+  
+  # Model mapping for specific model@provider combinations
+  # This allows you to define aliases and specific configurations
+  model_mapping:
+    # OpenAI model mappings
+    "gpt-4@openai":
+      provider: "openai"
+      model: "gpt-4"
+      generation_kwargs:
+        temperature: 0.7
+        max_tokens: 2048
+    
+    "gpt-3.5-turbo@openai":
+      provider: "openai"
+      model: "gpt-3.5-turbo"
+      generation_kwargs:
+        temperature: 0.8
+        max_tokens: 1024
+    
+    # Ollama model mappings
+    "qwen3:32b@ollama":
+      provider: "ollama"
+      model: "qwen3:32b"
+      generation_kwargs:
+        temperature: 0.7
+        top_p: 0.9
+        top_k: 40
+    
+    "deepseek-r1:1.5b@ollama":
+      provider: "ollama"
+      model: "deepseek-r1:1.5b"
+      generation_kwargs:
+        temperature: 0.6
+        top_p: 0.8
+        repeat_penalty: 1.1
+    
+    "llama2:7b@ollama":
+      provider: "ollama"
+      model: "llama2:7b"
+      generation_kwargs:
+        temperature: 0.8
+        top_k: 50
+    
+    # Aliases for convenience
+    "fast-chat":
+      provider: "openai"
+      model: "gpt-3.5-turbo"
+      generation_kwargs:
+        temperature: 0.9
+        max_tokens: 512
+    
+    "code-assistant":
+      provider: "ollama"
+      model: "codellama:13b"
+      generation_kwargs:
+        temperature: 0.3
+        top_p: 0.7
+    
+    "chinese-chat":
+      provider: "ollama"
+      model: "qwen3:32b"
+      generation_kwargs:
+        temperature: 0.7
+        top_p: 0.9

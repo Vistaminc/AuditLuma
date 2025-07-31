@@ -15,6 +15,23 @@ from loguru import logger
 from auditluma.models.code import SourceFile, CodeUnit, FileType
 
 
+class CodeParser:
+    """代码解析器类，提供统一的代码解析接口"""
+    
+    def __init__(self):
+        """初始化代码解析器"""
+        pass
+    
+    async def parse_file_async(self, source_file: SourceFile) -> List[CodeUnit]:
+        """异步解析文件，返回代码单元列表"""
+        return await extract_code_units(source_file)
+    
+    def parse_file(self, source_file: SourceFile) -> List[CodeUnit]:
+        """同步解析文件，返回代码单元列表"""
+        import asyncio
+        return asyncio.run(self.parse_file_async(source_file))
+
+
 async def extract_code_units(source_file: SourceFile) -> List[CodeUnit]:
     """从源文件中提取代码单元"""
     try:

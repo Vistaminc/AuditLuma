@@ -1,0 +1,329 @@
+# 层级RAG架构配置文件
+# AuditLuma Hierarchical RAG Configuration
+
+# 全局层级RAG设置
+hierarchical_rag:
+  enabled: true
+  version: "1.0.0"
+  
+  # Haystack编排层配置
+  haystack:
+    enabled: true
+    
+    # Haystack-AI配置
+    use_haystack_ai: true  # 使用官方Haystack-AI库
+    model_name: "gpt-3.5-turbo"  # 默认模型，支持 model@provider 格式
+    max_tokens: 2000
+    temperature: 0.1
+    top_k: 5
+    similarity_threshold: 0.7
+    enable_embeddings: true
+    enable_ranking: true
+    enable_document_splitting: true
+    
+    # 任务特定模型配置
+    task_configs:
+      security_scan:
+        model_name: ""  # 空表示使用默认模型，可设置为 "gpt-4@openai"
+        max_tokens: 2500
+        temperature: 0.05  # 更低的温度以获得更一致的安全分析
+        
+      syntax_check:
+        model_name: ""
+        max_tokens: 1500
+        temperature: 0.0   # 语法检查需要确定性结果
+        
+      logic_analysis:
+        model_name: ""
+        max_tokens: 2000
+        temperature: 0.1
+        
+      dependency_analysis:
+        model_name: ""
+        max_tokens: 1800
+        temperature: 0.1
+    
+    # 并行任务配置
+    max_workers: 10
+    task_timeout: 300  # 秒
+    retry_attempts: 3
+    retry_delay: 1.0
+    enable_parallel_execution: true
+    load_balancing: true
+    
+    # 错误处理和回退
+    enable_fallback: true  # 启用回退到传统方法
+    fallback_on_error: true  # 出错时回退
+    circuit_breaker_enabled: true
+    circuit_breaker_threshold: 5
+    
+    # 结果整合策略
+    result_integration_strategy: "consensus"  # weighted_average, consensus, majority_vote
+    
+    # 任务优先级权重
+    task_priorities:
+      syntax_check: 1
+      logic_analysis: 2
+      security_scan: 3
+      dependency_analysis: 2
+    
+    # 性能监控
+    performance_monitoring: true
+    performance_log_interval: 60  # 秒
+    
+  # txtai知识检索层配置  
+  txtai:
+    # 知识源配置
+    knowledge_sources:
+      cve_database:
+        enabled: true
+        url: "https://cve.mitre.org/data/downloads/"
+        update_frequency: "daily"
+        cache_duration: 86400  # 24小时
+        
+      owasp:
+        enabled: true
+        url: "https://owasp.org/www-project-top-ten/"
+        update_frequency: "weekly"
+        cache_duration: 604800  # 7天
+        
+      sans:
+        enabled: true
+        url: "https://www.sans.org/top25-software-errors/"
+        update_frequency: "weekly"
+        cache_duration: 604800
+        
+      nist:
+        enabled: true
+        url: "https://nvd.nist.gov/"
+        update_frequency: "daily"
+        cache_duration: 86400
+    
+    # 最佳实践数据库
+    best_practices:
+      sources: ["owasp", "sans", "nist"]
+      custom_rules_file: "./data/custom_best_practices.json"
+      
+    # 历史案例数据库
+    historical_cases:
+      retention_days: 365
+      max_cases_per_type: 1000
+      similarity_threshold: 0.8
+      
+    # 缓存配置
+    cache:
+      enabled: true
+      cache_dir: "./data/txtai_cache"
+      max_cache_size: "1GB"
+      cleanup_interval: 3600  # 1小时
+      
+    # API配置
+    api:
+      timeout: 30
+      max_retries: 3
+      retry_delay: 2
+      
+  # R2R上下文增强层配置
+  r2r:
+    # 上下文分析深度
+    max_context_depth: 5
+    dataflow_analysis_depth: 3
+    
+    # 阈值配置
+    impact_scope_threshold: 0.7
+    semantic_similarity_threshold: 0.8
+    call_chain_max_length: 10
+    
+    # 调用图构建
+    call_graph:
+      include_indirect_calls: true
+      include_dynamic_calls: false  # 动态调用分析（实验性）
+      max_graph_nodes: 10000
+      
+    # 数据流分析
+    dataflow:
+      enable_taint_analysis: true
+      taint_sources: ["input", "request", "argv", "environ"]
+      taint_sinks: ["execute", "eval", "system", "write"]
+      sanitizers: ["escape", "validate", "sanitize"]
+      
+    # 影响面分析
+    impact_analysis:
+      max_propagation_depth: 5
+      risk_weights:
+        critical_functions: 3.0
+        public_apis: 2.5
+        data_handlers: 2.0
+        utility_functions: 1.0
+        
+    # 语义分析
+    semantic_analysis:
+      enable_variable_analysis: true
+      enable_control_flow_analysis: true
+      enable_error_handling_analysis: true
+      enable_security_pattern_analysis: true
+      
+    # 缓存配置
+    cache:
+      enable_global_context_cache: true
+      cache_ttl: 3600  # 1小时
+      max_cache_entries: 1000
+      
+  # Self-RAG验证层配置
+  self_rag:
+    # 验证阈值
+    confidence_threshold: 0.75
+    consensus_threshold: 0.6
+    
+    # 超时配置
+    validation_timeout: 60  # 秒
+    cross_validation_timeout: 30  # 秒
+    
+    # 交叉验证配置
+    cross_validation:
+      enabled: true
+      min_models: 2
+      max_models: 3
+      models:
+        - "gpt-4-turbo@openai"
+        - "deepseek-chat@deepseek"
+        - "qwen-turbo@qwen"
+        
+    # 置信度计算权重
+    confidence_factors:
+      code_quality: 0.2
+      pattern_match: 0.25
+      context_completeness: 0.2
+      historical_accuracy: 0.15
+      cross_validation: 0.2
+      
+    # 假阳性过滤
+    false_positive_filter:
+      enabled: true
+      learning_rate: 0.1
+      pattern_cache_size: 1000
+      
+      # 预定义过滤规则
+      rules:
+        filter_test_files: true
+        filter_example_code: true
+        filter_comments: true
+        filter_documentation: true
+        filter_placeholders: true
+        
+      # 学习配置
+      enable_learning: true
+      feedback_weight: 0.3
+      pattern_confidence_threshold: 0.6
+      
+    # 批量验证配置
+    batch_validation:
+      max_concurrency: 10
+      batch_size: 50
+      enable_progress_tracking: true
+      
+# 性能优化配置
+performance:
+  # 缓存策略
+  caching:
+    enable_multi_level_cache: true
+    l1_cache_size: "256MB"  # 内存缓存
+    l2_cache_size: "2GB"    # 磁盘缓存
+    cache_compression: true
+    
+  # 并行处理
+  parallelization:
+    max_workers: 20
+    enable_async_processing: true
+    task_queue_size: 1000
+    
+  # 资源管理
+  resources:
+    max_memory_usage: "4GB"
+    enable_memory_monitoring: true
+    gc_threshold: 0.8
+    
+# 监控和日志配置
+monitoring:
+  # 性能监控
+  performance_monitoring:
+    enabled: true
+    metrics_collection_interval: 30  # 秒
+    metrics_retention_days: 30
+    
+  # 质量监控
+  quality_monitoring:
+    enabled: true
+    track_accuracy: true
+    track_false_positive_rate: true
+    track_processing_time: true
+    
+  # 日志配置
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+    enable_structured_logging: true
+    log_file: "./logs/hierarchical_rag.log"
+    max_log_size: "100MB"
+    backup_count: 5
+    
+# 实验性功能
+experimental:
+  # AI增强的跨文件分析
+  enhanced_cross_file_analysis:
+    enabled: false
+    model: "gpt-4-turbo@openai"
+    
+  # 动态调用分析
+  dynamic_call_analysis:
+    enabled: false
+    analysis_depth: 3
+    
+  # 机器学习增强
+  ml_enhancement:
+    enabled: false
+    model_path: "./models/vulnerability_classifier.pkl"
+    
+# 集成配置
+integration:
+  # 向后兼容
+  backward_compatibility:
+    enable_legacy_mode: true
+    legacy_fallback: true
+    
+  # API集成
+  api_integration:
+    enable_rest_api: true
+    api_version: "v2"
+    
+  # 数据库集成
+  database:
+    enable_result_storage: true
+    connection_string: "sqlite:///./data/hierarchical_rag.db"
+    
+# 安全配置
+security:
+  # API安全
+  api_security:
+    enable_rate_limiting: true
+    max_requests_per_minute: 100
+    
+  # 数据安全
+  data_security:
+    encrypt_cache: false
+    secure_temp_files: true
+    
+# 部署配置
+deployment:
+  # 环境配置
+  environment: "development"  # development, staging, production
+  
+  # 扩展配置
+  scaling:
+    enable_horizontal_scaling: false
+    max_instances: 3
+    
+  # 健康检查
+  health_check:
+    enabled: true
+    check_interval: 60  # 秒
+    timeout: 10  # 秒

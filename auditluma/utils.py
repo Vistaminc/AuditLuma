@@ -405,12 +405,17 @@ def detect_provider_from_model(model_name: str) -> str:
 
 class OllamaClient:
     """自定义Ollama客户端，模拟OpenAI客户端接口"""
-    
+
     def __init__(self, model_name: str):
         """初始化Ollama客户端"""
         self.model_name = model_name
         import httpx
-        
+
+        # 从配置中获取 Ollama 的 base_url
+        from auditluma.config import Config
+        provider_config = Config.get_llm_provider_config("ollama")
+        self.base_url = provider_config.base_url
+
         # 创建带有超时设置的httpx客户端
         timeout_settings = httpx.Timeout(
             connect=30.0,
@@ -419,7 +424,6 @@ class OllamaClient:
             pool=15.0
         )
         self.http_client = httpx.AsyncClient(timeout=timeout_settings)
-        self.base_url = "http://localhost:11434/api"
         self.chat = self.ChatCompletion(self)
         logger.info(f"初始化Ollama客户端，模型: {model_name}, API地址: {self.base_url}")
     
@@ -434,9 +438,32 @@ class OllamaClient:
         async def create(self, model=None, messages=None, temperature=0.7, max_tokens=None, **kwargs):
             """调用Ollama聊天接口"""
             model = model or self.parent.model_name
-            
+
             # 转换OpenAI格式的消息到Ollama格式
             try:
+                # 检查是否启用了模拟模式，如果是则直接使用模拟模式（默认为 false）
+                import os
+                mock_mode = os.environ.get("AUDITLUMA_MOCK_LLM", "false").lower()
+                if mock_mode in ["true", "1", "yes"]:
+                    logger.info("检测到模拟模式已启用，直接使用模拟响应")
+                    from auditluma.mocks.llm_client import MockLLMClient
+                    mock_client = MockLLMClient()
+                    return await mock_client.chat.completions.create(model=model, messages=messages, **kwargs)
+
+                # 首先检查Ollama服务是否可用
+                try:
+                    health_url = f"{self.parent.base_url}/tags"
+                    health_response = await self.parent.http_client.get(
+                        health_url,
+                        timeout=5.0
+                    )
+                    health_response.raise_for_status()
+                    logger.debug("Ollama服务健康检查通过")
+                except Exception as health_error:
+                    logger.error(f"Ollama服务不可用: {health_error}")
+                    logger.warning("Ollama服务不可用，建议设置环境变量 AUDITLUMA_MOCK_LLM=true 启用模拟模式")
+                    raise Exception(f"Ollama服务不可用，请确保Ollama已启动或设置 AUDITLUMA_MOCK_LLM=true 启用模拟模式: {health_error}")
+                
                 # 简化消息格式以兼容Ollama API
                 prompt = ""
                 
@@ -474,14 +501,13 @@ class OllamaClient:
                     payload_chat["max_tokens"] = max_tokens
                     payload_completion["max_tokens"] = max_tokens
                 
-                # Ollama只支持一种格式，使用自定义的完整API路径
+                # 首先尝试聊天接口
                 try:
-                    # 构建更完整的消息格式
                     logger.debug(f"发送请求到Ollama API: {payload_chat}")
-                    
-                    # 使用正确的Ollama API端点
+
+                    chat_url = f"{self.parent.base_url}/chat"
                     response = await self.parent.http_client.post(
-                        "http://localhost:11434/api/chat",  # 直接使用完整URL路径
+                        chat_url,
                         json=payload_chat,
                         timeout=120.0
                     )
@@ -495,15 +521,52 @@ class OllamaClient:
                     # 转换Ollama响应为OpenAI格式
                     return OllamaResponse(response_data)
                     
-                except Exception as e:
-                    logger.error(f"Ollama API调用失败: {e}")
-                    # 重新抛出异常以便于高层捕获
-                    raise Exception(f"Ollama API调用失败: {e}")
-                
+                except Exception as chat_error:
+                    logger.warning(f"聊天接口失败，尝试生成接口: {chat_error}")
+
+                    # 如果聊天接口失败，尝试生成接口
+                    try:
+                        generate_url = f"{self.parent.base_url}/generate"
+                        response = await self.parent.http_client.post(
+                            generate_url,
+                            json=payload_completion,
+                            timeout=120.0
+                        )
+
+                        response.raise_for_status()
+                        response_data = response.json()
+                        logger.info(f"成功从 Ollama 生成接口获取响应")
+
+                        # 转换生成接口响应为OpenAI格式
+                        return OllamaResponse(response_data)
+
+                    except Exception as generate_error:
+                        logger.error(f"Ollama生成接口也失败: {generate_error}")
+
+                        # 检查是否可以使用模拟模式作为最后的回退（默认为 false）
+                        import os
+                        mock_mode = os.environ.get("AUDITLUMA_MOCK_LLM", "false").lower()
+                        if mock_mode in ["true", "1", "yes"]:
+                            logger.info("Ollama API完全失败，使用模拟模式作为回退")
+                            from auditluma.mocks.llm_client import MockLLMClient
+                            mock_client = MockLLMClient()
+                            return await mock_client.chat.completions.create(model=model, messages=messages, **kwargs)
+                        else:
+                            raise Exception(f"Ollama API调用失败: {generate_error}")
+
             except Exception as e:
                 logger.error(f"Ollama API调用出错: {e}")
-                # 重新包装异常，以便于调用者处理
-                raise Exception(f"Connection error: {e}")
+                # 检查是否可以使用模拟模式（默认为 false）
+                import os
+                mock_mode = os.environ.get("AUDITLUMA_MOCK_LLM", "false").lower()
+                if mock_mode in ["true", "1", "yes"]:
+                    logger.info("Ollama API出错，使用模拟模式作为回退")
+                    from auditluma.mocks.llm_client import MockLLMClient
+                    mock_client = MockLLMClient()
+                    return await mock_client.chat.completions.create(model=model, messages=messages, **kwargs)
+                else:
+                    # 重新包装异常，以便于调用者处理
+                    raise Exception(f"Connection error: {e}")
 
 
 class OllamaResponse:
@@ -531,12 +594,23 @@ class OllamaResponse:
         
         # 检查响应结构，适配不同的Ollama API响应格式
         content = ""
+        
+        # 处理聊天接口响应格式
         if "message" in ollama_response and isinstance(ollama_response["message"], dict):
-            # 标准Ollama格式
+            # 标准Ollama聊天格式
             content = ollama_response["message"].get("content", "")
+        # 处理生成接口响应格式
         elif "response" in ollama_response:
-            # 另一种Ollama响应格式
+            # Ollama生成接口格式
             content = ollama_response["response"]
+        # 处理错误情况
+        elif "error" in ollama_response:
+            content = f"Error: {ollama_response['error']}"
+            logger.error(f"Ollama返回错误: {ollama_response['error']}")
+        else:
+            # 未知格式，尝试提取任何文本内容
+            content = str(ollama_response)
+            logger.warning(f"未知的Ollama响应格式: {ollama_response}")
         
         # 创建消息对象
         message = self.Message(content=content)
@@ -546,6 +620,28 @@ class OllamaResponse:
         
         # 设置选择列表
         self.choices = [choice]
+
+
+async def check_ollama_service() -> bool:
+    """检查Ollama服务是否可用"""
+    try:
+        import httpx
+        from auditluma.config import Config
+
+        # 从配置中获取 Ollama 的 base_url
+        provider_config = Config.get_llm_provider_config("ollama")
+        base_url = provider_config.base_url
+        health_url = f"{base_url}/tags"
+
+        timeout_settings = httpx.Timeout(connect=5.0, read=5.0)
+        async with httpx.AsyncClient(timeout=timeout_settings) as client:
+            response = await client.get(health_url)
+            response.raise_for_status()
+            logger.info("Ollama服务运行正常")
+            return True
+    except Exception as e:
+        logger.error(f"Ollama服务检查失败: {e}")
+        return False
 
 
 def init_llm_client(model: Optional[str] = None) -> Any:
@@ -561,8 +657,9 @@ def init_llm_client(model: Optional[str] = None) -> Any:
     """
     import os  # 添加导入，确保os模块在函数内可用
     
-    # 检查是否启用模拟模式
-    if os.environ.get("AUDITLUMA_MOCK_LLM", "").lower() in ["true", "1", "yes"]:
+    # 检查是否启用模拟模式（默认为 false）
+    mock_mode = os.environ.get("AUDITLUMA_MOCK_LLM", "false").lower()
+    if mock_mode in ["true", "1", "yes"]:
         logger.info("LLM模拟模式已启用，将使用模拟响应")
         from auditluma.mocks.llm_client import MockLLMClient
         return MockLLMClient()

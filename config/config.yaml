@@ -65,23 +65,23 @@ baichuan:
 
 # Ollama 配置
 ollama:
-  model: "llama2"  # 或其他您部署的模型名称，如 "qwen"、"deepseek" 等
+  model: "deepseek-r1:1.5b"  # 使用实际可用的模型名称
   api_key: ""  # Ollama 本地部署不需要 API key
-  base_url: "http://localhost:11434/v1"  # Ollama 的 API 地址
+  base_url: "http://localhost:11434/api"  # Ollama 的原生 API 地址
   max_tokens: 8000
   temperature: 0.1
 # Ollama_emd 配置
 ollama_emd:
   model: "mxbai-embed-large:latest"  # 或其他您部署的模型名称，如 "qwen"、"deepseek" 等
   api_key: ""  # Ollama 本地部署不需要 API key
-  base_url: "http://localhost:11434/v1/embeddings"  # Ollama 的 API 地址
+  base_url: "http://localhost:11434/api/embeddings"  # Ollama 的嵌入 API 地址
   max_tokens: 8000
   temperature: 0.1
 
 # 代理设置
 agent:
-  # 默认使用的LLM提供商
-  default_provider: "openai"
+  # 默认使用的LLM提供商 - 改为ollama以使用本地模型
+  default_provider: "ollama"
   # 系统提示词
   system_prompt: "你是一个专业的代码安全审计助手，将帮助用户分析代码中的安全漏洞"
   # 记忆容量
@@ -95,7 +95,7 @@ project:
   ignored_extensions: [".jpg", ".png", ".gif", ".mp3", ".mp4", ".zip", ".tar", ".gz"]
   ignored_directories: ["node_modules", "__pycache__", ".git", "dist", "build", "venv", "env"]
 
-# Self-RAG 配置
+# 传统Self-RAG系统配置（基础检索增强生成）
 self_rag:
   enabled: true
   vector_store: "faiss"
@@ -164,7 +164,45 @@ output:
 
 # 默认模型配置
 default_models:
-  code_analysis: "deepseek-r1:1.5b@ollama"  
-  security_audit: "deepseek-r1:1.5b@ollama"
-  remediation: "deepseek-r1:1.5b@ollama"
-  summarization: "deepseek-r1:1.5b@ollama"
+  code_analysis: "qwen3:32b@ollama"  
+  security_audit: "qwen3:32b@ollama"
+  remediation: "qwen3:32b@ollama"
+  summarization: "qwen3:32b@ollama"
+
+# 层级RAG架构模型配置
+hierarchical_rag_models:
+  # 是否启用层级RAG架构
+  enabled: true
+  
+  # Haystack编排层配置
+  haystack:
+    # 编排器类型选择：traditional（传统）或 ai（Haystack-AI，推荐）
+    orchestrator_type: "ai"  # 默认使用Haystack-AI编排器
+    
+    # 默认模型（支持 model@provider 格式）
+    default_model: "qwen3:32b@ollama"
+    
+    # 任务特定模型配置
+    task_models:
+      security_scan: "qwen3:32b@ollama"        # 安全扫描使用更强的模型
+      syntax_check: "qwen3:32b@ollama" # 语法检查
+      logic_analysis: "qwen3:32b@ollama" # 逻辑分析
+      dependency_analysis: "qwen3:32b@ollama" # 依赖分析
+  
+  # txtai知识检索层模型配置
+  txtai:
+    retrieval_model: "qwen3:32b@ollama"  # 知识检索模型
+    embedding_model: "mxbai-embed-large:latest@ollama_emd"  # 嵌入模型
+  
+  # R2R上下文增强层模型配置
+  r2r:
+    context_model: "qwen3:32b@ollama"    # 上下文分析模型
+    enhancement_model: "qwen3:32b@ollama" # 增强模型
+  
+  # Self-RAG验证层模型配置（层级RAG第四层：漏洞验证和假阳性过滤）
+  self_rag_validation:
+    validation_model: "qwen3:32b@ollama"  # 主验证模型
+    cross_validation_models:  # 交叉验证使用的多个模型
+      - "qwen3:32b@ollama"
+      - "qwen3:32b@ollama"
+      - "qwen3:32b@ollama"

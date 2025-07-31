@@ -15,7 +15,7 @@ from auditluma.config import Config
 from auditluma.agents.base import BaseAgent
 from auditluma.mcp.protocol import MessageType, MessagePriority
 from auditluma.models.code import SourceFile, CodeUnit, VulnerabilityResult, SeverityLevel
-from auditluma.rag.self_rag import self_rag
+from auditluma.rag.enhanced_self_rag import enhanced_self_rag as self_rag
 from auditluma.utils import init_llm_client
 
 

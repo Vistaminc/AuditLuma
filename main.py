@@ -18,7 +18,15 @@ import yaml
 from loguru import logger
 
 from auditluma.config import Config, load_config
-from auditluma.orchestrator import AgentOrchestrator
+# Import AgentOrchestrator from the orchestrator.py file (not the directory)
+import importlib.util
+import os
+orchestrator_path = os.path.join(os.path.dirname(__file__), 'auditluma', 'orchestrator.py')
+spec = importlib.util.spec_from_file_location("auditluma.orchestrator_module", orchestrator_path)
+orchestrator_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(orchestrator_module)
+AgentOrchestrator = orchestrator_module.AgentOrchestrator
+from auditluma.orchestrator.compatibility import UnifiedOrchestrator, ArchitectureMode, create_unified_orchestrator
 from auditluma.scanner import CodeScanner
 from auditluma.utils import setup_logging, calculate_project_hash
 from auditluma.visualizer.report_generator import ReportGenerator
@@ -52,6 +60,21 @@ def init() -> argparse.Namespace:
     parser.add_argument("-f", "--format", type=str, choices=["html", "pdf", "json"], 
                         default=Config.get_report_format(),
                         help=f"报告格式（默认：{Config.get_report_format()}）")
+    
+    # 架构选择参数
+    parser.add_argument("--architecture", type=str, choices=["traditional", "hierarchical", "auto"], 
+                        default="auto",
+                        help="选择RAG架构模式：traditional（传统）、hierarchical（层级）、auto（自动选择，默认）")
+    parser.add_argument("--force-traditional", action="store_true",
+                        help="强制使用传统RAG架构（等同于 --architecture traditional）")
+    parser.add_argument("--force-hierarchical", action="store_true",
+                        help="强制使用层级RAG架构（等同于 --architecture hierarchical）")
+    parser.add_argument("--enable-performance-comparison", action="store_true",
+                        help="启用性能对比模式（同时运行两种架构进行对比）")
+    parser.add_argument("--auto-switch-threshold", type=int, default=100,
+                        help="自动切换架构的文件数量阈值（默认：100）")
+    
+    # 传统功能参数
     parser.add_argument("--no-mcp", action="store_true",
                         help="禁用多智能体协作协议")
     parser.add_argument("--no-self-rag", action="store_true",
@@ -64,10 +87,50 @@ def init() -> argparse.Namespace:
                         help="禁用跨文件漏洞检测")
     parser.add_argument("--enhanced-analysis", action="store_true",
                         help="启用增强的跨文件安全分析（实验性功能）")
+    
+    # 层级RAG特定参数
+    parser.add_argument("--haystack-orchestrator", type=str, choices=["traditional", "ai"], 
+                        default=None,
+                        help="选择Haystack编排器类型：traditional（传统）或 ai（Haystack-AI，默认）")
+    parser.add_argument("--enable-txtai", action="store_true",
+                        help="启用txtai知识检索层（层级RAG模式）")
+    parser.add_argument("--enable-r2r", action="store_true",
+                        help="启用R2R上下文增强层（层级RAG模式）")
+    parser.add_argument("--enable-self-rag-validation", action="store_true",
+                        help="启用Self-RAG验证层（层级RAG模式）")
+    parser.add_argument("--disable-caching", action="store_true",
+                        help="禁用层级缓存系统")
+    parser.add_argument("--disable-monitoring", action="store_true",
+                        help="禁用性能监控")
+    
+    # 其他参数
     parser.add_argument("--verbose", action="store_true",
                         help="启用详细日志记录")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="试运行模式（不执行实际分析）")
+    parser.add_argument("--config-migrate", action="store_true",
+                        help="迁移配置到层级RAG格式")
+    parser.add_argument("--show-architecture-info", action="store_true",
+                        help="显示当前架构信息并退出")
     
     args = parser.parse_args()
+    
+    # 处理架构选择参数
+    if args.force_traditional:
+        args.architecture = "traditional"
+    elif args.force_hierarchical:
+        args.architecture = "hierarchical"
+    
+    # 处理配置迁移
+    if args.config_migrate:
+        # 标记需要迁移，在main函数中处理
+        args._needs_migration = True
+        return args
+    
+    # 显示架构信息
+    if args.show_architecture_info:
+        show_architecture_info()
+        return args
     
     # 从参数更新配置
     Config.project.max_batch_size = args.workers
@@ -76,6 +139,17 @@ def init() -> argparse.Namespace:
     Config.global_config.report_dir = args.output
     Config.global_config.report_format = args.format
     
+    # 设置架构相关配置
+    Config.architecture_mode = args.architecture
+    Config.auto_switch_threshold = args.auto_switch_threshold
+    Config.enable_performance_comparison = args.enable_performance_comparison
+    
+    # 设置Haystack编排器类型
+    if args.haystack_orchestrator:
+        # 更新层级RAG模型配置中的编排器类型
+        if hasattr(Config, 'hierarchical_rag_models') and Config.hierarchical_rag_models:
+            Config.hierarchical_rag_models.haystack["orchestrator_type"] = args.haystack_orchestrator
+    
     # 如果输出目录不存在，则创建它
     output_dir = Path(args.output)
     if not output_dir.exists():
@@ -83,23 +157,144 @@ def init() -> argparse.Namespace:
         logger.info(f"创建了输出目录：{args.output}")
     
     # 记录启动信息
-    logger.info(f"在以下目录开始AuditLuma分析：{args.directory}")
-    logger.info(f"输出将保存到：{args.output}")
-    logger.info(f"报告格式：{args.format}")
-    logger.info(f"MCP已启用：{Config.mcp.enabled}")
-    logger.info(f"Self-RAG已启用：{Config.self_rag.enabled}")
-    logger.info(f"依赖分析已启用：{not args.no_deps}")
-    logger.info(f"修复建议已启用：{not args.no_remediation}")
-    logger.info(f"跨文件分析已启用：{not args.no_cross_file}")
+    logger.info(f"🚀 在以下目录开始AuditLuma分析：{args.directory}")
+    logger.info(f"📁 输出将保存到：{args.output}")
+    logger.info(f"📄 报告格式：{args.format}")
+    logger.info(f"🏗️ RAG架构模式：{args.architecture}")
+    logger.info(f"⚙️ 工作线程数：{args.workers}")
+    logger.info(f"🤖 MCP已启用：{Config.mcp.enabled}")
+    logger.info(f"🔍 Self-RAG已启用：{Config.self_rag.enabled}")
+    logger.info(f"🔗 依赖分析已启用：{not args.no_deps}")
+    logger.info(f"🛠️ 修复建议已启用：{not args.no_remediation}")
+    logger.info(f"📊 跨文件分析已启用：{not args.no_cross_file}")
+    
+    if args.architecture == "hierarchical":
+        # 显示Haystack编排器类型
+        orchestrator_type = args.haystack_orchestrator or (
+            Config.hierarchical_rag_models.haystack.get("orchestrator_type", "ai") 
+            if hasattr(Config, 'hierarchical_rag_models') and Config.hierarchical_rag_models 
+            else "ai"
+        )
+        orchestrator_name = "Haystack-AI" if orchestrator_type == "ai" else "传统Haystack"
+        logger.info(f"🌟 使用层级RAG架构（{orchestrator_name} + txtai + R2R + Self-RAG）")
+    elif args.architecture == "traditional":
+        logger.info("🔧 使用传统RAG架构")
+    else:
+        logger.info("🎯 自动选择架构模式（基于项目规模）")
+    
     if args.enhanced_analysis:
         logger.info("✨ 增强跨文件分析模式已启用（实验性功能）")
+    
+    if args.enable_performance_comparison:
+        logger.info("📈 性能对比模式已启用")
+    
+    if args.dry_run:
+        logger.info("🧪 试运行模式已启用")
     
     return args
 
 
+async def handle_config_migration():
+    """处理配置迁移"""
+    try:
+        from auditluma.migration.config_migrator import migrate_config_async
+        
+        logger.info("🔄 开始配置迁移...")
+        success, migration_result = await migrate_config_async()
+        
+        if success:
+            logger.info("✅ 配置迁移成功")
+            logger.info(f"📁 备份文件：{migration_result.get('backup_path', 'N/A')}")
+            logger.info(f"🔧 应用了 {len(migration_result.get('changes', []))} 个更改")
+            
+            if migration_result.get('warnings'):
+                logger.warning("⚠️ 迁移警告：")
+                for warning in migration_result['warnings']:
+                    logger.warning(f"  - {warning}")
+        else:
+            logger.error("❌ 配置迁移失败")
+            for error in migration_result.get('errors', []):
+                logger.error(f"  - {error}")
+                
+    except ImportError:
+        logger.error("配置迁移工具不可用")
+    except Exception as e:
+        logger.error(f"配置迁移过程中出错: {e}")
+
+
+def show_architecture_info():
+    """显示架构信息"""
+    logger.info("🏗️ AuditLuma架构信息")
+    logger.info("=" * 50)
+    
+    # 显示可用架构
+    logger.info("📋 可用架构模式：")
+    logger.info("  • traditional - 传统RAG架构（单层智能体协作）")
+    logger.info("  • hierarchical - 层级RAG架构（四层：Haystack + txtai + R2R + Self-RAG）")
+    logger.info("  • auto - 自动选择（基于项目规模和复杂度）")
+    
+    # 显示当前配置
+    current_mode = getattr(Config, 'architecture_mode', 'auto')
+    logger.info(f"\n🎯 当前配置的架构模式：{current_mode}")
+    
+    # 显示Haystack编排器选择
+    logger.info("\n🚀 Haystack编排器选择：")
+    try:
+        if hasattr(Config, 'hierarchical_rag_models') and Config.hierarchical_rag_models:
+            orchestrator_type = Config.hierarchical_rag_models.get_orchestrator_type()
+            orchestrator_name = "Haystack-AI编排器" if orchestrator_type == "ai" else "传统Haystack编排器"
+            logger.info(f"  • 当前选择：{orchestrator_name} ({orchestrator_type})")
+            logger.info(f"  • 可选类型：traditional（传统）、ai（Haystack-AI，推荐）")
+            logger.info(f"  • 切换方式：--haystack-orchestrator [traditional|ai]")
+        else:
+            logger.info("  • 默认：Haystack-AI编排器 (ai)")
+    except Exception as e:
+        logger.warning(f"  ⚠️ 无法读取编排器配置: {e}")
+    
+    # 显示层级RAG组件状态
+    logger.info("\n🌟 层级RAG组件状态：")
+    try:
+        hierarchical_config = getattr(Config, 'hierarchical_rag', {})
+        if hierarchical_config:
+            logger.info(f"  • Haystack编排层：{'✅ 启用' if hierarchical_config.get('haystack', {}).get('enabled', True) else '❌ 禁用'}")
+            logger.info(f"  • txtai知识检索层：{'✅ 启用' if hierarchical_config.get('txtai', {}).get('enabled', True) else '❌ 禁用'}")
+            logger.info(f"  • R2R上下文增强层：{'✅ 启用' if hierarchical_config.get('r2r', {}).get('enabled', True) else '❌ 禁用'}")
+            logger.info(f"  • Self-RAG验证层：{'✅ 启用' if hierarchical_config.get('self_rag_validation', {}).get('enabled', True) else '❌ 禁用'}")
+            logger.info(f"  • 层级缓存系统：{'✅ 启用' if hierarchical_config.get('cache', {}).get('enabled', True) else '❌ 禁用'}")
+            logger.info(f"  • 性能监控：{'✅ 启用' if hierarchical_config.get('monitoring', {}).get('enabled', True) else '❌ 禁用'}")
+        else:
+            logger.info("  ⚠️ 层级RAG配置未找到，请运行 --config-migrate 进行配置迁移")
+    except Exception as e:
+        logger.warning(f"  ⚠️ 无法读取层级RAG配置: {e}")
+    
+    # 显示兼容性信息
+    logger.info("\n🔄 兼容性信息：")
+    logger.info("  • 支持从传统架构无缝切换到层级架构")
+    logger.info("  • 支持配置热重载和动态架构切换")
+    logger.info("  • 提供A/B测试框架进行性能对比")
+    logger.info("  • 完全向后兼容现有API和配置")
+    
+    logger.info("\n💡 使用建议：")
+    logger.info("  • 小项目（<100文件）：推荐使用 traditional 架构")
+    logger.info("  • 大项目（≥100文件）：推荐使用 hierarchical 架构")
+    logger.info("  • 不确定时：使用 auto 模式让系统自动选择")
+    logger.info("  • 编排器选择：推荐使用 ai（Haystack-AI编排器）")
+    logger.info("  • 性能对比：使用 --enable-performance-comparison 参数")
+    
+    logger.info("\n🔧 命令示例：")
+    logger.info("  • 使用Haystack-AI编排器：--architecture hierarchical --haystack-orchestrator ai")
+    logger.info("  • 使用传统编排器：--architecture hierarchical --haystack-orchestrator traditional")
+    logger.info("  • 查看架构信息：--show-architecture-info")
+    
+    logger.info("=" * 50)
+
+
 async def run_analysis(target_dir: str, output_dir: str, workers: int, 
                      skip_deps: bool = False, skip_remediation: bool = False,
-                     skip_cross_file: bool = False, enhanced_analysis: bool = False) -> Dict[str, Any]:
+                     skip_cross_file: bool = False, enhanced_analysis: bool = False,
+                     architecture_mode: str = "auto", 
+                     enable_performance_comparison: bool = False,
+                     dry_run: bool = False) -> Dict[str, Any]:
     """运行代码分析过程
     
     Args:
@@ -110,6 +305,9 @@ async def run_analysis(target_dir: str, output_dir: str, workers: int,
         skip_remediation: 是否跳过生成修复建议
         skip_cross_file: 是否跳过跨文件漏洞检测
         enhanced_analysis: 是否启用增强的跨文件分析
+        architecture_mode: RAG架构模式
+        enable_performance_comparison: 是否启用性能对比
+        dry_run: 是否为试运行模式
         
     Returns:
         包含分析结果的字典
@@ -145,9 +343,44 @@ async def run_analysis(target_dir: str, output_dir: str, workers: int,
     total_lines = sum(len(sf.content.splitlines()) for sf in source_files)
     logger.info(f"找到{total_files}个要分析的源文件，共{total_lines}行代码")
     
-    # 初始化智能体协调器
-    orchestrator = AgentOrchestrator(workers=workers)
-    await orchestrator.initialize_agents()
+    # 如果是试运行模式，直接返回模拟结果
+    if dry_run:
+        logger.info("🧪 试运行模式：跳过实际分析，返回模拟结果")
+        return {
+            "vulnerabilities": [],
+            "dependency_graph": None,
+            "code_structure": {},
+            "remediation_data": None,
+            "scan_info": {
+                "project_name": Config.project.name,
+                "scan_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "scanned_files": total_files,
+                "scanned_lines": total_lines,
+                "scan_duration": "0.00秒（试运行）",
+                "project_hash": project_hash,
+                "architecture_mode": architecture_mode,
+                "dry_run": True
+            }
+        }
+    
+    # 初始化统一编排器（支持架构切换）
+    try:
+        orchestrator = create_unified_orchestrator(
+            workers=workers,
+            architecture_mode=architecture_mode,
+            enable_performance_comparison=enable_performance_comparison,
+            auto_switch_threshold=getattr(Config, 'auto_switch_threshold', 100),
+            compatibility_mode=True
+        )
+        await orchestrator.initialize_orchestrators()
+        logger.info(f"🎯 统一编排器初始化完成，当前架构: {orchestrator.current_mode.value if orchestrator.current_mode else 'unknown'}")
+        
+    except Exception as e:
+        logger.warning(f"统一编排器初始化失败，回退到传统编排器: {e}")
+        # 回退到传统编排器
+        orchestrator = AgentOrchestrator(workers=workers)
+        await orchestrator.initialize_agents()
+        logger.info("🔧 使用传统编排器")
     
     # 运行安全分析
     if skip_cross_file:
@@ -185,13 +418,34 @@ async def run_analysis(target_dir: str, output_dir: str, workers: int,
     end_time = time.time()
     scan_duration = end_time - start_time
     
+    # 获取架构信息
+    architecture_info = {}
+    if hasattr(orchestrator, 'get_orchestrator_info'):
+        try:
+            architecture_info = orchestrator.get_orchestrator_info()
+        except Exception as e:
+            logger.debug(f"获取架构信息失败: {e}")
+    
+    # 获取性能摘要
+    performance_summary = {}
+    if hasattr(orchestrator, 'get_performance_summary'):
+        try:
+            performance_summary = orchestrator.get_performance_summary()
+        except Exception as e:
+            logger.debug(f"获取性能摘要失败: {e}")
+    
     scan_info = {
         "project_name": Config.project.name,
         "scan_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "scanned_files": total_files,
         "scanned_lines": total_lines,
         "scan_duration": f"{scan_duration:.2f}秒",
-        "project_hash": project_hash
+        "project_hash": project_hash,
+        "architecture_mode": architecture_mode,
+        "actual_architecture": orchestrator.current_mode.value if hasattr(orchestrator, 'current_mode') and orchestrator.current_mode else "traditional",
+        "architecture_info": architecture_info,
+        "performance_summary": performance_summary,
+        "enable_performance_comparison": enable_performance_comparison
     }
     
     return {
@@ -285,9 +539,10 @@ def save_analysis_data(analysis_results: Dict[str, Any]) -> str:
     data_path.parent.mkdir(exist_ok=True)
     
     # 准备要保存的数据
+    scan_info = analysis_results.get("scan_info", {})
     save_data = {
         "analysis_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "scan_info": analysis_results.get("scan_info", {}),
+        "scan_info": scan_info,
         "vulnerabilities_count": len(analysis_results.get("vulnerabilities", [])),
         "vulnerabilities": [],
         "dependency_info": {
@@ -297,6 +552,13 @@ def save_analysis_data(analysis_results: Dict[str, Any]) -> str:
         "remediation_info": {
             "has_remediation": analysis_results.get("remediation_data") is not None,
             "remediation_count": analysis_results.get("remediation_data", {}).get("remediation_count", 0) if analysis_results.get("remediation_data") else 0
+        },
+        "architecture_info": {
+            "requested_mode": scan_info.get("architecture_mode", "unknown"),
+            "actual_mode": scan_info.get("actual_architecture", "unknown"),
+            "performance_comparison_enabled": scan_info.get("enable_performance_comparison", False),
+            "architecture_details": scan_info.get("architecture_info", {}),
+            "performance_summary": scan_info.get("performance_summary", {})
         }
     }
     
@@ -367,6 +629,15 @@ async def main() -> None:
     """主入口点"""
     args = init()
     
+    # 处理配置迁移
+    if getattr(args, '_needs_migration', False):
+        await handle_config_migration()
+        return
+    
+    # 处理特殊命令
+    if args.show_architecture_info:
+        return
+    
     try:
         # 运行分析
         analysis_results = await run_analysis(
@@ -376,7 +647,10 @@ async def main() -> None:
             skip_deps=args.no_deps,
             skip_remediation=args.no_remediation,
             skip_cross_file=args.no_cross_file,
-            enhanced_analysis=args.enhanced_analysis
+            enhanced_analysis=args.enhanced_analysis,
+            architecture_mode=args.architecture,
+            enable_performance_comparison=args.enable_performance_comparison,
+            dry_run=args.dry_run
         )
         
         # 保存分析数据到history目录
@@ -384,17 +658,46 @@ async def main() -> None:
         
         # 打印摘要
         vulnerabilities = analysis_results.get("vulnerabilities", [])
-        severity_counts = {severity: 0 for severity in Config.output.severity_levels}
+        scan_info = analysis_results.get("scan_info", {})
+        
+        if args.dry_run:
+            logger.info("🧪 试运行完成")
+            logger.info(f"📁 扫描文件数: {scan_info.get('scanned_files', 0)}")
+            logger.info(f"📝 代码行数: {scan_info.get('scanned_lines', 0)}")
+            logger.info(f"🏗️ 架构模式: {scan_info.get('architecture_mode', 'unknown')}")
+            return
+        
+        # 统计漏洞严重程度
+        severity_counts = {}
         for vuln in vulnerabilities:
-            severity_counts[vuln.severity.lower()] += 1
+            severity = getattr(vuln, 'severity', 'unknown')
+            if hasattr(severity, 'lower'):
+                severity = severity.lower()
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
         
-        logger.info("分析摘要：")
-        for severity, count in severity_counts.items():
-            logger.info(f"  {severity.upper()}：{count}")
+        logger.info("📊 分析摘要：")
+        logger.info(f"  📁 扫描文件: {scan_info.get('scanned_files', 0)}")
+        logger.info(f"  📝 代码行数: {scan_info.get('scanned_lines', 0)}")
+        logger.info(f"  ⏱️ 分析耗时: {scan_info.get('scan_duration', 'N/A')}")
+        logger.info(f"  🏗️ 使用架构: {scan_info.get('actual_architecture', 'unknown')}")
+        logger.info(f"  🔍 发现漏洞: {len(vulnerabilities)}")
         
-        logger.info(f"分析完成！数据已保存到：{data_path}")
-        logger.info("请使用Web界面生成不同格式的报告")
-        logger.info("运行命令：python -m auditluma.web.report_server")
+        if severity_counts:
+            logger.info("  📈 严重程度分布:")
+            for severity, count in severity_counts.items():
+                logger.info(f"    {severity.upper()}: {count}")
+        
+        # 显示性能对比信息（如果启用）
+        if args.enable_performance_comparison and scan_info.get('performance_summary'):
+            perf_summary = scan_info['performance_summary']
+            logger.info("📈 性能对比:")
+            for arch, stats in perf_summary.get('performance_stats', {}).items():
+                if stats.get('calls', 0) > 0:
+                    logger.info(f"  {arch}: 平均耗时 {stats.get('avg_time', 0):.2f}秒")
+        
+        logger.info(f"✅ 分析完成！数据已保存到：{data_path}")
+        logger.info("🌐 请使用Web界面生成不同格式的报告")
+        logger.info("🚀 运行命令：python -m auditluma.web.report_server")
     
     except Exception as e:
         logger.error(f"分析过程中出错: {e}")

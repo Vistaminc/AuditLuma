@@ -14,7 +14,7 @@ from auditluma.config import Config
 from auditluma.mcp.protocol import agent_coordinator, MessageType
 from auditluma.agents.base import BaseAgent
 from auditluma.models.code import SourceFile, CodeUnit, VulnerabilityResult
-from auditluma.rag.self_rag import self_rag
+from auditluma.rag.enhanced_self_rag import enhanced_self_rag as self_rag
 
 # 导入CVSS 4.0相关模块
 from auditluma.models.cvss4 import (

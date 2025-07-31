@@ -12,7 +12,7 @@ from pathlib import Path
 from loguru import logger
 
 from auditluma.models.code import SourceFile, CodeUnit, VulnerabilityResult, SeverityLevel, FileType
-from auditluma.rag.self_rag import self_rag
+from auditluma.rag.enhanced_self_rag import enhanced_self_rag as self_rag
 from .global_context_analyzer import GlobalContextAnalyzer, CrossFileFlow
 
 

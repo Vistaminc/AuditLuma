@@ -134,9 +134,9 @@ class OllamaEmbedder:
         # 使用指定的提供商或默认使用ollama_emd提供商
         provider = provider or "ollama_emd"
         provider_config = Config.get_llm_provider_config(provider)
-        
-        # 确保使用正确的API端点，无论配置是什么
-        self.base_url = "http://localhost:11434/api/embeddings"
+
+        # 从配置中获取API端点
+        self.base_url = provider_config.base_url
         
         # 初始化API客户端
         import httpx
@@ -154,6 +154,21 @@ class OllamaEmbedder:
     
     async def aembed(self, text: str) -> List[float]:
         """异步生成嵌入向量且带有重试机制"""
+        # 检查是否启用了模拟模式
+        import os
+        if os.environ.get("AUDITLUMA_MOCK_LLM", "").lower() in ["true", "1", "yes"]:
+            logger.info("检测到模拟模式已启用，生成模拟嵌入向量")
+            # 生成模拟嵌入向量
+            import random
+            random.seed(hash(text) % (2**32))  # 使用文本哈希作为种子，确保相同文本得到相同向量
+            embedding = [random.uniform(-1, 1) for _ in range(1024)]
+            # 归一化向量
+            magnitude = sum(x*x for x in embedding) ** 0.5
+            if magnitude > 0:
+                embedding = [x/magnitude for x in embedding]
+            logger.info(f"生成模拟嵌入向量，长度: {len(embedding)}")
+            return embedding
+
         # Ollama的embeddings API格式
         payload = {
             "model": self.model_name,
@@ -222,7 +237,7 @@ class OllamaEmbedder:
                         logger.error("服务器内部错误: 可能是模型不存在或配置错误 (尝试 'ollama pull mxbai-embed-large')")
                     elif "503" in error_str:
                         logger.error("服务不可用错误: 请确保Ollama正在运行且已加载嵌入模型")
-                    
+
                     # 如果还有其他可选格式可以尝试
                     payload_index = alternative_payloads.index(current_payload) + 1
                     if payload_index < len(alternative_payloads):
@@ -232,8 +247,24 @@ class OllamaEmbedder:
                         attempt = 0
                         continue
                     else:
-                        # 所有格式均已尝试失败
-                        raise
+                        # 所有格式均已尝试失败，检查是否可以使用模拟模式（默认为 false）
+                        import os
+                        mock_mode = os.environ.get("AUDITLUMA_MOCK_LLM", "false").lower()
+                        if mock_mode in ["true", "1", "yes"]:
+                            logger.info("Ollama嵌入API失败，使用模拟嵌入向量")
+                            # 生成模拟嵌入向量
+                            import random
+                            random.seed(hash(text) % (2**32))  # 使用文本哈希作为种子，确保相同文本得到相同向量
+                            embedding = [random.uniform(-1, 1) for _ in range(1024)]
+                            # 归一化向量
+                            magnitude = sum(x*x for x in embedding) ** 0.5
+                            if magnitude > 0:
+                                embedding = [x/magnitude for x in embedding]
+                            logger.info(f"生成模拟嵌入向量，长度: {len(embedding)}")
+                            return embedding
+                        else:
+                            # 所有格式均已尝试失败
+                            raise
                 
                 # 否则记录错误并准备重试
                 logger.warning(f"生成Ollama嵌入失败 (重试{attempt+1}/{max_retries}): {e}")
@@ -450,13 +481,13 @@ class SelfRAG:
                 self.embedder = OllamaEmbedder(model_name=model_name, provider=provider)
                 # 创建后备嵌入器
                 self.fallback_embedder = SimpleEmbedder()
-                logger.info(f"使用Ollama嵌入模型: {model_name}(已准备后备嵌入器)")
+                logger.info(f"📚 传统Self-RAG系统 - 使用Ollama嵌入模型: {model_name} (已准备后备嵌入器)")
             else:
                 # 默认使用OpenAI兼容的嵌入模型
                 self.embedder = OpenAIEmbedder(model_name=embedding_model)
                 # 从配置中获取模型名称，可能已在OpenAIEmbedder中通过parse_model_spec解析
                 model_name = self.embedder.model_name
-                logger.info(f"使用嵌入模型: {model_name}")
+                logger.info(f"📚 传统Self-RAG系统 - 使用嵌入模型: {model_name}")
         except Exception as e:
             logger.warning(f"无法初始化嵌入模型: {e}")
             self.embedder = SimpleEmbedder()
