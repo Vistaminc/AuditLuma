@@ -413,6 +413,9 @@ AuditLuma支持以下报告格式：
 </div>
 
 
+## Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=vistaminc/Auditluma&type=Date)](https://www.star-history.com/#)
+
 ## 📜 许可证
 
 MIT
