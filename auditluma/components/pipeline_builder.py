@@ -233,7 +233,13 @@ class HaystackPipelineBuilder:
             # Validate pipeline before returning
             self._validate_pipeline()
             
-            logger.info(f"Built pipeline with {len(self.pipeline.components)} components")
+            # Handle different Haystack versions
+            if HAYSTACK_AVAILABLE and hasattr(self.pipeline, 'graph'):
+                component_count = len(self.pipeline.graph.nodes)
+            else:
+                components = getattr(self.pipeline, 'components', getattr(self.pipeline, '_components', {}))
+                component_count = len(components)
+            logger.info(f"Built pipeline with {component_count} components")
             return self.pipeline
             
         except Exception as e:
@@ -241,7 +247,17 @@ class HaystackPipelineBuilder:
     
     def _validate_pipeline(self):
         """Validate the pipeline configuration."""
-        if not self.pipeline.components:
+        # Handle different Haystack versions
+        if HAYSTACK_AVAILABLE and hasattr(self.pipeline, 'graph'):
+            # Real Haystack pipeline uses NetworkX graph
+            components = self.pipeline.graph.nodes
+            component_count = len(components)
+        else:
+            # Mock pipeline or older version
+            components = getattr(self.pipeline, 'components', getattr(self.pipeline, '_components', {}))
+            component_count = len(components)
+        
+        if component_count == 0:
             raise HaystackIntegrationError("Pipeline has no components")
         
         # Check for UnifiedGenerator components
@@ -258,24 +274,50 @@ class HaystackPipelineBuilder:
         Returns:
             Dictionary containing component information
         """
+        # Handle different Haystack versions
+        if HAYSTACK_AVAILABLE and hasattr(self.pipeline, 'graph'):
+            # Real Haystack pipeline uses NetworkX graph
+            component_names = list(self.pipeline.graph.nodes)
+            component_count = len(component_names)
+            connections_count = len(self.pipeline.graph.edges)
+        else:
+            # Mock pipeline or older version
+            components = getattr(self.pipeline, 'components', getattr(self.pipeline, '_components', {}))
+            component_names = list(components.keys())
+            component_count = len(components)
+            connections_count = len(getattr(self.pipeline, 'connections', []))
+        
         info = {
-            "total_components": len(self.pipeline.components),
+            "total_components": component_count,
             "unified_generators": len(self._generators),
             "components": {},
-            "connections": len(getattr(self.pipeline, 'connections', []))
+            "connections": connections_count
         }
         
         # Add component details
-        for name, component in self.pipeline.components.items():
-            component_info = {
-                "type": type(component).__name__,
-                "is_unified_generator": isinstance(component, UnifiedGenerator)
-            }
+        for name in component_names:
+            if HAYSTACK_AVAILABLE and hasattr(self.pipeline, 'get_component'):
+                try:
+                    component = self.pipeline.get_component(name)
+                except:
+                    component = None
+            else:
+                components = getattr(self.pipeline, 'components', {})
+                component = components.get(name)
             
-            if isinstance(component, UnifiedGenerator):
-                component_info.update(component.get_component_info())
-            
-            info["components"][name] = component_info
+            if component:
+                component_info = {
+                    "type": type(component).__name__,
+                    "is_unified_generator": isinstance(component, UnifiedGenerator)
+                }
+                
+                if isinstance(component, UnifiedGenerator):
+                    try:
+                        component_info.update(component.get_component_info())
+                    except:
+                        pass
+                
+                info["components"][name] = component_info
         
         return info
 
@@ -306,13 +348,20 @@ class PipelineSerializer:
                 pipeline_data = pipeline.to_dict()
             else:
                 # Use custom serialization for mock pipeline
-                pipeline_data = {
-                    "components": {
-                        name: component.to_dict() if hasattr(component, 'to_dict') else str(component)
-                        for name, component in pipeline.components.items()
-                    },
-                    "connections": getattr(pipeline, 'connections', [])
-                }
+                # Handle different Haystack versions
+                if HAYSTACK_AVAILABLE and hasattr(pipeline, 'graph'):
+                    # Real Haystack pipeline - use to_dict method
+                    pipeline_data = pipeline.to_dict()
+                else:
+                    # Mock pipeline
+                    components = getattr(pipeline, 'components', getattr(pipeline, '_components', {}))
+                    pipeline_data = {
+                        "components": {
+                            name: component.to_dict() if hasattr(component, 'to_dict') else str(component)
+                            for name, component in components.items()
+                        },
+                        "connections": getattr(pipeline, 'connections', [])
+                    }
             
             import json
             with open(path, 'w', encoding='utf-8') as f:

@@ -48,14 +48,18 @@ from auditluma.orchestrator.task_decomposer import TaskDecomposer, TaskCollectio
 from auditluma.orchestrator.parallel_executor import ParallelProcessingManager, TaskScheduler
 from auditluma.orchestrator.result_integrator import ResultIntegrator, ConflictResolutionStrategy
 
-# Import UnifiedGenerator for Ollama support
+# Import UnifiedGenerator and HaystackPipelineBuilder for enhanced support
 try:
     from auditluma.components.unified_generator import UnifiedGenerator
+    from auditluma.components.pipeline_builder import HaystackPipelineBuilder
     UNIFIED_GENERATOR_AVAILABLE = True
 except (ImportError, AttributeError) as e:
     logger.warning(f"UnifiedGenerator not available: {e}")
     UNIFIED_GENERATOR_AVAILABLE = False
     class UnifiedGenerator: 
+        def __init__(self, *args, **kwargs):
+            pass
+    class HaystackPipelineBuilder:
         def __init__(self, *args, **kwargs):
             pass
 
@@ -233,6 +237,40 @@ class HaystackPipelineBuilder:
             logger.debug(f"获取Ollama环境变量配置时出错: {e}")
         
         return ollama_config
+    
+    def _get_openai_config(self, model_name: str) -> Dict[str, Any]:
+        """获取OpenAI兼容模型的配置"""
+        # 从配置文件读取OpenAI设置
+        try:
+            openai_config = getattr(Config, 'openai', {})
+            api_key = openai_config.api_key if hasattr(openai_config, 'api_key') else ""
+            base_url = openai_config.base_url if hasattr(openai_config, 'base_url') else ""
+            
+            config = {
+                "api_key": api_key,
+                "base_url": base_url
+            }
+            
+            # 从环境变量获取覆盖设置，或将配置设置为环境变量
+            import os
+            if "OPENAI_API_KEY" in os.environ:
+                config["api_key"] = os.environ["OPENAI_API_KEY"]
+            elif config["api_key"]:
+                # 如果配置文件中有API key但环境变量中没有，设置环境变量
+                os.environ["OPENAI_API_KEY"] = config["api_key"]
+                
+            if "OPENAI_BASE_URL" in os.environ:
+                config["base_url"] = os.environ["OPENAI_BASE_URL"]
+            elif config["base_url"]:
+                # 如果配置文件中有base_url但环境变量中没有，设置环境变量
+                os.environ["OPENAI_BASE_URL"] = config["base_url"]
+            
+            logger.debug(f"OpenAI配置: api_key={'***' if config['api_key'] else 'None'}, base_url={config['base_url']}")
+            return config
+            
+        except Exception as e:
+            logger.debug(f"获取OpenAI配置失败: {e}")
+            return {"api_key": "", "base_url": ""}
     
     def _handle_ollama_error(self, error: Exception, model_name: str, operation: str) -> bool:
         """
@@ -446,27 +484,43 @@ class HaystackPipelineBuilder:
                 logger.info(f"   服务地址: {ollama_config['base_url']}")
                 
             else:
-                # 非Ollama模型，使用默认配置
-                provider = None  # 让UnifiedGenerator自动检测
-                clean_model_name = model_name
+                # 非Ollama模型，检测提供商类型
+                if "@" in model_name:
+                    clean_model_name, provider = model_name.split("@", 1)
+                else:
+                    clean_model_name = model_name
+                    provider = "openai"  # 默认为OpenAI兼容
                 
-                logger.debug(f"🔧 创建通用UnifiedGenerator配置:")
+                logger.debug(f"🔧 创建{provider}UnifiedGenerator配置:")
                 logger.debug(f"   模型: {clean_model_name}")
-                logger.debug(f"   提供商: 自动检测")
+                logger.debug(f"   提供商: {provider}")
+                
+                # 为OpenAI兼容模型准备配置
+                generator_config = {
+                    "generation_kwargs": {
+                        "max_tokens": config.get("max_tokens", 2000),
+                        "temperature": config.get("temperature", 0.1)
+                    },
+                    "timeout": config.get("timeout", 30.0),
+                    "max_retries": config.get("max_retries", 3),
+                    "enable_monitoring": True
+                }
+                
+                # 如果是OpenAI兼容模型，添加API配置
+                if provider == "openai":
+                    openai_config = self._get_openai_config(model_name)
+                    if openai_config.get("api_key"):
+                        generator_config["api_key"] = openai_config["api_key"]
+                    if openai_config.get("base_url"):
+                        generator_config["base_url"] = openai_config["base_url"]
                 
                 generator = UnifiedGenerator(
                     model=clean_model_name,
                     provider=provider,
-                    generation_kwargs={
-                        "max_tokens": config.get("max_tokens", 2000),
-                        "temperature": config.get("temperature", 0.1)
-                    },
-                    timeout=config.get("timeout", 30.0),
-                    max_retries=config.get("max_retries", 3),
-                    enable_monitoring=True
+                    **generator_config
                 )
                 
-                logger.info(f"✅ 成功创建通用UnifiedGenerator，模型: {clean_model_name}")
+                logger.info(f"✅ 成功创建{provider}UnifiedGenerator，模型: {clean_model_name}")
             
             return generator
             
@@ -540,43 +594,35 @@ class HaystackPipelineBuilder:
             required_variables=["code_content", "file_path", "language", "knowledge_context"]
         ))
         
-        # 根据模型类型选择生成器
-        if is_ollama:
-            # 记录Ollama执行路径
-            self._log_provider_execution_path(model_name, "ollama", "security_scan")
+        # 使用UnifiedGenerator支持所有提供商
+        try:
+            # 记录执行路径
+            provider = "ollama" if is_ollama else "openai"
+            self._log_provider_execution_path(model_name, provider, "security_scan")
             
-            # 使用UnifiedGenerator支持Ollama
+            # 获取并设置配置（对于OpenAI兼容模型）
+            if not is_ollama:
+                openai_config = self._get_openai_config(model_name)
+            
+            # 创建UnifiedGenerator
             generator = self._create_unified_generator(model_name, config)
             if generator is None:
-                logger.error(f"❌ 无法创建Ollama生成器，模型: {model_name}")
+                logger.error(f"❌ 无法创建生成器，模型: {model_name}")
                 self._implement_graceful_fallback(model_name, "security_scan", Exception("Generator creation failed"))
                 return None
             
-            try:
-                pipeline.add_component("llm", generator)
-                logger.info(f"✅ 使用UnifiedGenerator创建安全扫描管道，Ollama模型: {model_name}")
-            except Exception as e:
-                logger.warning(f"⚠️ UnifiedGenerator Haystack集成失败: {e}")
+            pipeline.add_component("llm", generator)
+            logger.info(f"✅ 使用UnifiedGenerator创建安全扫描管道，模型: {model_name} ({provider})")
+            
+        except Exception as e:
+            logger.error(f"❌ UnifiedGenerator创建失败: {e}")
+            # 对于Ollama错误，尝试特殊处理
+            if is_ollama:
                 should_fallback = self._handle_ollama_error(e, model_name, "pipeline_integration")
                 if should_fallback:
                     self._implement_graceful_fallback(model_name, "security_scan", e)
                 return None
-        else:
-            # 记录OpenAI执行路径
-            self._log_provider_execution_path(model_name, "openai", "security_scan")
-            
-            try:
-                # 使用OpenAIGenerator支持OpenAI兼容模型
-                pipeline.add_component("llm", OpenAIGenerator(
-                    model=model_name,
-                    generation_kwargs={
-                        "max_tokens": config["max_tokens"],
-                        "temperature": config["temperature"]
-                    }
-                ))
-                logger.info(f"✅ 使用OpenAIGenerator创建安全扫描管道，OpenAI兼容模型: {model_name}")
-            except Exception as e:
-                logger.error(f"❌ OpenAIGenerator创建失败: {e}")
+            else:
                 self._implement_graceful_fallback(model_name, "security_scan", e)
                 return None
         
@@ -632,43 +678,35 @@ class HaystackPipelineBuilder:
             required_variables=["code_content", "file_path", "language"]
         ))
         
-        # 根据模型类型选择生成器
-        if is_ollama:
-            # 记录Ollama执行路径
-            self._log_provider_execution_path(model_name, "ollama", "syntax_check")
+        # 使用UnifiedGenerator支持所有提供商
+        try:
+            # 记录执行路径
+            provider = "ollama" if is_ollama else "openai"
+            self._log_provider_execution_path(model_name, provider, "syntax_check")
             
-            # 使用UnifiedGenerator支持Ollama
+            # 获取并设置配置（对于OpenAI兼容模型）
+            if not is_ollama:
+                openai_config = self._get_openai_config(model_name)
+            
+            # 创建UnifiedGenerator
             generator = self._create_unified_generator(model_name, config)
             if generator is None:
-                logger.error(f"❌ 无法创建Ollama生成器，模型: {model_name}")
+                logger.error(f"❌ 无法创建生成器，模型: {model_name}")
                 self._implement_graceful_fallback(model_name, "syntax_check", Exception("Generator creation failed"))
                 return None
             
-            try:
-                pipeline.add_component("llm", generator)
-                logger.info(f"✅ 使用UnifiedGenerator创建语法检查管道，Ollama模型: {model_name}")
-            except Exception as e:
-                logger.warning(f"⚠️ UnifiedGenerator Haystack集成失败: {e}")
+            pipeline.add_component("llm", generator)
+            logger.info(f"✅ 使用UnifiedGenerator创建语法检查管道，模型: {model_name} ({provider})")
+            
+        except Exception as e:
+            logger.error(f"❌ UnifiedGenerator创建失败: {e}")
+            # 对于Ollama错误，尝试特殊处理
+            if is_ollama:
                 should_fallback = self._handle_ollama_error(e, model_name, "pipeline_integration")
                 if should_fallback:
                     self._implement_graceful_fallback(model_name, "syntax_check", e)
                 return None
-        else:
-            # 记录OpenAI执行路径
-            self._log_provider_execution_path(model_name, "openai", "syntax_check")
-            
-            try:
-                # 使用OpenAIGenerator支持OpenAI兼容模型
-                pipeline.add_component("llm", OpenAIGenerator(
-                    model=model_name,
-                    generation_kwargs={
-                        "max_tokens": config["max_tokens"],
-                        "temperature": config["temperature"]
-                    }
-                ))
-                logger.info(f"✅ 使用OpenAIGenerator创建语法检查管道，OpenAI兼容模型: {model_name}")
-            except Exception as e:
-                logger.error(f"❌ OpenAIGenerator创建失败: {e}")
+            else:
                 self._implement_graceful_fallback(model_name, "syntax_check", e)
                 return None
         
@@ -729,43 +767,35 @@ class HaystackPipelineBuilder:
             required_variables=["code_content", "file_path", "language", "context_info"]
         ))
         
-        # 根据模型类型选择生成器
-        if is_ollama:
-            # 记录Ollama执行路径
-            self._log_provider_execution_path(model_name, "ollama", "logic_analysis")
+        # 使用UnifiedGenerator支持所有提供商
+        try:
+            # 记录执行路径
+            provider = "ollama" if is_ollama else "openai"
+            self._log_provider_execution_path(model_name, provider, "logic_analysis")
             
-            # 使用UnifiedGenerator支持Ollama
+            # 获取并设置配置（对于OpenAI兼容模型）
+            if not is_ollama:
+                openai_config = self._get_openai_config(model_name)
+            
+            # 创建UnifiedGenerator
             generator = self._create_unified_generator(model_name, config)
             if generator is None:
-                logger.error(f"❌ 无法创建Ollama生成器，模型: {model_name}")
+                logger.error(f"❌ 无法创建生成器，模型: {model_name}")
                 self._implement_graceful_fallback(model_name, "logic_analysis", Exception("Generator creation failed"))
                 return None
             
-            try:
-                pipeline.add_component("llm", generator)
-                logger.info(f"✅ 使用UnifiedGenerator创建逻辑分析管道，Ollama模型: {model_name}")
-            except Exception as e:
-                logger.warning(f"⚠️ UnifiedGenerator Haystack集成失败: {e}")
+            pipeline.add_component("llm", generator)
+            logger.info(f"✅ 使用UnifiedGenerator创建逻辑分析管道，模型: {model_name} ({provider})")
+            
+        except Exception as e:
+            logger.error(f"❌ UnifiedGenerator创建失败: {e}")
+            # 对于Ollama错误，尝试特殊处理
+            if is_ollama:
                 should_fallback = self._handle_ollama_error(e, model_name, "pipeline_integration")
                 if should_fallback:
                     self._implement_graceful_fallback(model_name, "logic_analysis", e)
                 return None
-        else:
-            # 记录OpenAI执行路径
-            self._log_provider_execution_path(model_name, "openai", "logic_analysis")
-            
-            try:
-                # 使用OpenAIGenerator支持OpenAI兼容模型
-                pipeline.add_component("llm", OpenAIGenerator(
-                    model=model_name,
-                    generation_kwargs={
-                        "max_tokens": config["max_tokens"],
-                        "temperature": config["temperature"]
-                    }
-                ))
-                logger.info(f"✅ 使用OpenAIGenerator创建逻辑分析管道，OpenAI兼容模型: {model_name}")
-            except Exception as e:
-                logger.error(f"❌ OpenAIGenerator创建失败: {e}")
+            else:
                 self._implement_graceful_fallback(model_name, "logic_analysis", e)
                 return None
         
@@ -824,43 +854,35 @@ class HaystackPipelineBuilder:
             required_variables=["code_content", "file_path", "language", "dependency_info"]
         ))
         
-        # 根据模型类型选择生成器
-        if is_ollama:
-            # 记录Ollama执行路径
-            self._log_provider_execution_path(model_name, "ollama", "dependency_analysis")
+        # 使用UnifiedGenerator支持所有提供商
+        try:
+            # 记录执行路径
+            provider = "ollama" if is_ollama else "openai"
+            self._log_provider_execution_path(model_name, provider, "dependency_analysis")
             
-            # 使用UnifiedGenerator支持Ollama
+            # 获取并设置配置（对于OpenAI兼容模型）
+            if not is_ollama:
+                openai_config = self._get_openai_config(model_name)
+            
+            # 创建UnifiedGenerator
             generator = self._create_unified_generator(model_name, config)
             if generator is None:
-                logger.error(f"❌ 无法创建Ollama生成器，模型: {model_name}")
+                logger.error(f"❌ 无法创建生成器，模型: {model_name}")
                 self._implement_graceful_fallback(model_name, "dependency_analysis", Exception("Generator creation failed"))
                 return None
             
-            try:
-                pipeline.add_component("llm", generator)
-                logger.info(f"✅ 使用UnifiedGenerator创建依赖分析管道，Ollama模型: {model_name}")
-            except Exception as e:
-                logger.warning(f"⚠️ UnifiedGenerator Haystack集成失败: {e}")
+            pipeline.add_component("llm", generator)
+            logger.info(f"✅ 使用UnifiedGenerator创建依赖分析管道，模型: {model_name} ({provider})")
+            
+        except Exception as e:
+            logger.error(f"❌ UnifiedGenerator创建失败: {e}")
+            # 对于Ollama错误，尝试特殊处理
+            if is_ollama:
                 should_fallback = self._handle_ollama_error(e, model_name, "pipeline_integration")
                 if should_fallback:
                     self._implement_graceful_fallback(model_name, "dependency_analysis", e)
                 return None
-        else:
-            # 记录OpenAI执行路径
-            self._log_provider_execution_path(model_name, "openai", "dependency_analysis")
-            
-            try:
-                # 使用OpenAIGenerator支持OpenAI兼容模型
-                pipeline.add_component("llm", OpenAIGenerator(
-                    model=model_name,
-                    generation_kwargs={
-                        "max_tokens": config["max_tokens"],
-                        "temperature": config["temperature"]
-                    }
-                ))
-                logger.info(f"✅ 使用OpenAIGenerator创建依赖分析管道，OpenAI兼容模型: {model_name}")
-            except Exception as e:
-                logger.error(f"❌ OpenAIGenerator创建失败: {e}")
+            else:
                 self._implement_graceful_fallback(model_name, "dependency_analysis", e)
                 return None
         
