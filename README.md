@@ -395,7 +395,7 @@ AuditLuma支持以下报告格式：
 
 ## 🤝 合作伙伴
 
-- [棉花糖网络安全圈](https://vip.bdziyi.com/)
+- [棉花糖网络安全圈](https://vip.bdziyi.com/?ref=711)
 
 ## 支持与赞赏
 
