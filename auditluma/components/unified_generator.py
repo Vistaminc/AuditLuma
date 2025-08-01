@@ -14,21 +14,32 @@ from datetime import datetime
 
 try:
     from haystack import component, default_from_dict, default_to_dict
-    from haystack.core.component import ComponentConfig
-    from haystack.core.serialization import DeserializationCallbacks
     HAYSTACK_AVAILABLE = True
 except ImportError:
     # Fallback for when Haystack is not available
     HAYSTACK_AVAILABLE = False
     
     def component(cls):
+        """Mock component decorator when Haystack is not available"""
+        def output_types(**kwargs):
+            def decorator(func):
+                func._output_types = kwargs
+                return func
+            return decorator
+        
+        cls.output_types = output_types
         return cls
     
+    # Add output_types as an attribute to the component function
+    component.output_types = lambda **kwargs: lambda func: func
+    
     def default_from_dict(data):
+        """Mock serialization function"""
         return data
     
     def default_to_dict(obj):
-        return obj.__dict__
+        """Mock serialization function"""
+        return getattr(obj, '__dict__', {})
 
 from .models import GeneratorConfig, GenerationResponse, PerformanceMetrics
 from .exceptions import (
@@ -128,6 +139,9 @@ class UnifiedGenerator:
             'max_retries': max_retries,
             'enable_monitoring': enable_monitoring
         }
+        
+        # Haystack component integration is handled by the @component decorator
+        # No manual socket creation needed
         
         logger.info(f"Initialized UnifiedGenerator with model: {model}")
     

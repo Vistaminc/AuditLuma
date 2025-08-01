@@ -164,10 +164,10 @@ output:
 
 # 默认模型配置
 default_models:
-  code_analysis: "qwen3:32b@ollama"  
-  security_audit: "qwen3:32b@ollama"
-  remediation: "qwen3:32b@ollama"
-  summarization: "qwen3:32b@ollama"
+  code_analysis: "deepseek-r1:1.5b@ollama"  
+  security_audit: "deepseek-r1:1.5b@ollama"
+  remediation: "deepseek-r1:1.5b@ollama"
+  summarization: "deepseek-r1:1.5b@ollama"
 
 # 层级RAG架构模型配置
 hierarchical_rag_models:
@@ -180,29 +180,29 @@ hierarchical_rag_models:
     orchestrator_type: "ai"  # 默认使用Haystack-AI编排器
     
     # 默认模型（支持 model@provider 格式）
-    default_model: "qwen3:32b@ollama"
+    default_model: "deepseek-r1:16b@ollama"
     
     # 任务特定模型配置
     task_models:
-      security_scan: "qwen3:32b@ollama"        # 安全扫描使用更强的模型
-      syntax_check: "qwen3:32b@ollama" # 语法检查
-      logic_analysis: "qwen3:32b@ollama" # 逻辑分析
-      dependency_analysis: "qwen3:32b@ollama" # 依赖分析
+      security_scan: "deepseek-r1:1.5b@ollama"        # 安全扫描使用更强的模型
+      syntax_check: "deepseek-r1:1.5b@ollama" # 语法检查
+      logic_analysis: "deepseek-r1:1.5b@ollama" # 逻辑分析
+      dependency_analysis: "deepseek-r1:1.5b@ollama" # 依赖分析
   
   # txtai知识检索层模型配置
   txtai:
-    retrieval_model: "qwen3:32b@ollama"  # 知识检索模型
+    retrieval_model: "deepseek-r1:1.5b@ollama"  # 知识检索模型
     embedding_model: "mxbai-embed-large:latest@ollama_emd"  # 嵌入模型
   
   # R2R上下文增强层模型配置
   r2r:
-    context_model: "qwen3:32b@ollama"    # 上下文分析模型
-    enhancement_model: "qwen3:32b@ollama" # 增强模型
+    context_model: "deepseek-r1:1.5b@ollama"    # 上下文分析模型
+    enhancement_model: "deepseek-r1:1.5b@ollama" # 增强模型
   
   # Self-RAG验证层模型配置（层级RAG第四层：漏洞验证和假阳性过滤）
   self_rag_validation:
-    validation_model: "qwen3:32b@ollama"  # 主验证模型
+    validation_model: "deepseek-r1:1.5b@ollama"  # 主验证模型
     cross_validation_models:  # 交叉验证使用的多个模型
-      - "qwen3:32b@ollama"
-      - "qwen3:32b@ollama"
-      - "qwen3:32b@ollama"
+      - "deepseek-r1:1.5b@ollama"
+      - "deepseek-r1:1.5b@ollama"
+      - "deepseek-r1:1.5b@ollama"
